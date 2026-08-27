@@ -637,7 +637,7 @@ function WeekRow({
                           <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
                         </svg>
                         {item.crewTag && (
-                          <span className="text-black text-[11px] font-extrabold leading-none">
+                          <span className="text-black text-[11px] font-normal leading-none">
                             {item.crewTag}
                           </span>
                         )}
@@ -1928,6 +1928,14 @@ export default function ScheduleCalendar({
   const dragRef = useRef(null)
   const dragPreviewRef = useRef(null)
   const suppressBarClickRef = useRef(false)
+  // Drag-to-edge month paging: while a move-drag hovers the top/bottom edge of
+  // the month grid we flip to the prev/next month (repeatedly, while held there).
+  const calGridRef = useRef(null)
+  const autoPageRef = useRef({ dir: null, timer: null })
+  function stopAutoPage() {
+    if (autoPageRef.current.timer) clearInterval(autoPageRef.current.timer)
+    autoPageRef.current = { dir: null, timer: null }
+  }
 
   function dayFromPoint(x, y) {
     // elementsFromPoint (plural) returns the full stack so we find the day cell
@@ -1948,6 +1956,29 @@ export default function ScheduleCalendar({
     // Track the cursor so the floating ghost (move mode) follows it in any
     // direction, even between days where no cell is directly under the pointer.
     setDragPos({ x: e.clientX, y: e.clientY })
+
+    // Drag-to-edge month paging (month view, move only): hovering the top/bottom
+    // edge of the visible grid flips months, and keeps flipping while held there.
+    if (d.mode === 'move' && viewMode === 'month' && calGridRef.current) {
+      const r = calGridRef.current.getBoundingClientRect()
+      const EDGE = 46
+      const topEdge = Math.max(r.top, 0)
+      const botEdge = Math.min(r.bottom, window.innerHeight)
+      let dir = null
+      if (e.clientY < topEdge + EDGE) dir = 'up'
+      else if (e.clientY > botEdge - EDGE) dir = 'down'
+      if (dir !== autoPageRef.current.dir) {
+        stopAutoPage()
+        if (dir) {
+          const page = () => (dir === 'up' ? prevMonth() : nextMonth())
+          page() // flip immediately, then repeat while the cursor stays at the edge
+          autoPageRef.current = { dir, timer: setInterval(page, 650) }
+        }
+      }
+    } else if (autoPageRef.current.dir) {
+      stopAutoPage()
+    }
+
     const day = dayFromPoint(e.clientX, e.clientY)
     if (!day) return
     let ns = d.origStart,
@@ -1977,6 +2008,7 @@ export default function ScheduleCalendar({
     const d = dragRef.current
     window.removeEventListener('pointermove', onBarPointerMove)
     window.removeEventListener('pointerup', onBarPointerUp)
+    stopAutoPage()
     dragRef.current = null
     const preview = dragPreviewRef.current
     dragPreviewRef.current = null
@@ -2649,7 +2681,7 @@ export default function ScheduleCalendar({
             </div>
           </div>
         ) : (
-          <div className="border-l border-gray-200">
+          <div className="border-l border-gray-200" ref={calGridRef}>
             {(viewMode === 'week' ? [weekDaysArr] : weeks).map((weekDays, idx) => (
               <WeekRow
                 key={idx}
@@ -2698,7 +2730,7 @@ export default function ScheduleCalendar({
           >
             {ghostItem.crewTag && (
               <span
-                className="flex-shrink-0 rounded px-1 py-0.5 border border-white/50 text-black text-[11px] font-extrabold leading-none"
+                className="flex-shrink-0 rounded px-1 py-0.5 border border-white/50 text-black text-[11px] font-normal leading-none"
                 style={{
                   backgroundColor: ghostItem.assignee_color || ghostItem.display_color || '#15803d',
                   backgroundImage:
