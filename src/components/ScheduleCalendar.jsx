@@ -643,7 +643,7 @@ function WeekRow({
                         }}
                         onClick={e => e.stopPropagation()}
                         title="Drag to reschedule"
-                        className="flex-shrink-0 flex items-center gap-1 rounded-md px-1.5 py-1 border border-white/50 select-none"
+                        className="flex-shrink-0 flex items-center gap-1 rounded-md px-1 py-0.5 border border-white/50 select-none"
                         style={{
                           cursor: 'grab',
                           zIndex: 3,
@@ -656,8 +656,8 @@ function WeekRow({
                       >
                         <svg
                           viewBox="0 0 24 24"
-                          width="15"
-                          height="15"
+                          width="13"
+                          height="13"
                           fill="none"
                           stroke="#fff"
                           strokeWidth="2"
@@ -670,7 +670,7 @@ function WeekRow({
                           <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
                         </svg>
                         {item.crewTag && (
-                          <span className="text-black text-sm font-semibold leading-none">
+                          <span className="text-black text-[12px] font-semibold leading-none">
                             {item.crewTag}
                           </span>
                         )}
@@ -3068,7 +3068,7 @@ export default function ScheduleCalendar({
           >
             {ghostItem.crewTag && (
               <span
-                className="flex-shrink-0 rounded-md px-1.5 py-1 border border-white/50 text-black text-sm font-semibold leading-none"
+                className="flex-shrink-0 rounded-md px-1 py-0.5 border border-white/50 text-black text-[12px] font-semibold leading-none"
                 style={{
                   backgroundColor: ghostItem.assignee_color || ghostItem.display_color || '#15803d',
                   backgroundImage:
