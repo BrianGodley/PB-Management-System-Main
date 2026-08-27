@@ -626,7 +626,7 @@ function WeekRow({
                           <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
                         </svg>
                         {item.crewTag && (
-                          <span className="text-white text-[10px] font-bold leading-none">
+                          <span className="text-black text-[11px] font-extrabold leading-none">
                             {item.crewTag}
                           </span>
                         )}
@@ -4249,7 +4249,9 @@ export default function ScheduleCalendar({
                       .filter(Boolean)
                       .map(empDisplay)
                       .filter(Boolean)
-                    return `${crew.label} - ${names.join(', ')}`
+                    // Crew names only — the crew letter now lives in the colored
+                    // chip on the calendar bar, so we don't prefix it here.
+                    return names.length ? names.join(', ') : `Crew ${crew.label}`
                   }
                   const crewSearch = crew => {
                     const allNames = [
