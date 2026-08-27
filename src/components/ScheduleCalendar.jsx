@@ -3074,31 +3074,42 @@ export default function ScheduleCalendar({
         <div
           style={{
             position: 'fixed',
-            left: dragPos.x + 14,
-            top: dragPos.y + 14,
+            left: dragPos.x + 16,
+            top: dragPos.y + 20,
             zIndex: 9999,
             pointerEvents: 'none',
           }}
         >
-          <div
-            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md shadow-xl text-white text-sm font-medium leading-snug max-w-[240px]"
+          {/* Large short blue down-arrow above the left, directing the drop */}
+          <svg
+            width="26"
+            height="30"
+            viewBox="0 0 24 30"
+            fill="#2563eb"
             style={{
-              backgroundColor: ghostItem.needs_crew
-                ? '#b45309'
-                : ghostItem.scheduling_type === 'yard_check'
-                  ? '#3b82f6'
-                  : ghostItem.display_color || '#15803d',
-              opacity: 0.96,
-              transform: 'rotate(-1.5deg)',
+              position: 'absolute',
+              top: -25,
+              left: 10,
+              filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))',
+            }}
+          >
+            <path d="M9 0 h6 v14 h5 l-8 10 l-8 -10 h5 z" />
+          </svg>
+          <div
+            className="flex items-center gap-2 px-3 py-2.5 rounded-lg shadow-xl text-base font-semibold leading-snug max-w-[300px]"
+            style={{
+              backgroundColor: '#dbeafe',
+              border: '2px solid #2563eb',
+              color: '#1e3a8a',
             }}
           >
             {ghostItem.crewTag && (
               <span
-                className="flex-shrink-0 rounded-md px-1 py-0.5 border border-white/50 text-black text-[12px] font-semibold leading-none"
+                className="flex-shrink-0 rounded-md px-1.5 py-0.5 border border-blue-300 text-black text-[13px] font-semibold leading-none"
                 style={{
                   backgroundColor: ghostItem.assignee_color || ghostItem.display_color || '#15803d',
                   backgroundImage:
-                    'linear-gradient(rgba(255,255,255,0.22),rgba(255,255,255,0.22))',
+                    'linear-gradient(rgba(255,255,255,0.25),rgba(255,255,255,0.25))',
                 }}
               >
                 {ghostItem.crewTag}
