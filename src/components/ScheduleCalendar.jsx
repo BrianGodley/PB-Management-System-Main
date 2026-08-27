@@ -1844,9 +1844,16 @@ export default function ScheduleCalendar({
     let ns = d.origStart,
       ne = d.origEnd
     if (d.mode === 'move') {
+      // Move preserves the WORKING-DAY count: shift the start (keeping where the
+      // bar was grabbed), then re-derive the end from the original work_days so a
+      // drop across a weekend keeps the same number of days (wraps to next week).
+      const incSat = d.item.include_saturday || false
+      const incSun = d.item.include_sunday || false
+      const wd =
+        +d.item.work_days || countWorkDays(d.origStart, d.origEnd, exceptions, incSat, incSun) || 1
       const shift = calDayDelta(d.grabDay, day)
       ns = addCalDays(d.origStart, shift)
-      ne = addCalDays(d.origEnd, shift)
+      ne = dateStr(addWorkDays(toLocalDate(ns), wd, exceptions, incSat, incSun))
     } else if (d.mode === 'resize-l') {
       ns = calDayDelta(day, d.origEnd) >= 0 ? day : d.origEnd
     } else if (d.mode === 'resize-r') {
