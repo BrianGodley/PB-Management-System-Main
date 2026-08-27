@@ -2369,6 +2369,9 @@ export default function ScheduleCalendar({
       needs_crew: editItem?.needs_crew
         ? !(form.crew_id || form.sub_id)
         : (editItem?.needs_crew ?? false),
+      // Stamp so a modal redate onto a booked day ranks as crew-tag position 1
+      // (no DB trigger updates this column; matches the drag/resize path).
+      updated_at: new Date().toISOString(),
     }
     const { error } = editItem
       ? await supabase.from('schedule_items').update(payload).eq('id', editItem.id)
