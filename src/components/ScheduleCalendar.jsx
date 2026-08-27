@@ -233,6 +233,62 @@ const EMPTY_FORM = {
 
 const DOW_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
+// ── Crew-overlap tags (G1 / G2 …) ────────────────────────────
+// When two or more items for the SAME crew share any calendar day, each bar
+// gets an alphanumeric tag: crew letter + position (crew G → G1, G2 …).
+// Position 1 = the item just dragged over the others: `activeId` (the bar being
+// dragged) is forced first for a live preview, and after the drop the most-
+// recently-updated row (updated_at DESC) ranks first, so the moved bar reads G1
+// and the one it landed on reads G2. A crew item with no overlap shows the bare
+// crew letter; items with no crew (or a crew with no label) get no tag.
+function computeCrewTags(items, crewLabelMap, activeId) {
+  const byCrew = {}
+  for (const it of items) {
+    if (it.needs_crew || !it.crew_id) continue
+    const letter = (crewLabelMap[it.crew_id] || '').trim()
+    if (!letter) continue
+    ;(byCrew[it.crew_id] || (byCrew[it.crew_id] = [])).push(it)
+  }
+  const tags = {}
+  for (const cid of Object.keys(byCrew)) {
+    const letter = (crewLabelMap[cid] || '').trim()
+    // Connected components by inclusive date-range overlap: sort by start, then
+    // sweep, unioning any item whose start falls on/before the running max end.
+    const sorted = [...byCrew[cid]].sort((a, b) => a.start_date.localeCompare(b.start_date))
+    const comps = []
+    let cur = null,
+      curEnd = null
+    for (const it of sorted) {
+      if (cur && it.start_date <= curEnd) {
+        cur.push(it)
+        if (it.end_date > curEnd) curEnd = it.end_date
+      } else {
+        cur = [it]
+        curEnd = it.end_date
+        comps.push(cur)
+      }
+    }
+    for (const comp of comps) {
+      if (comp.length < 2) {
+        tags[comp[0].id] = letter
+        continue
+      }
+      const ordered = [...comp].sort((a, b) => {
+        if (a.id === activeId) return -1
+        if (b.id === activeId) return 1
+        const au = a.updated_at || '',
+          bu = b.updated_at || ''
+        if (au !== bu) return bu.localeCompare(au) // newer first
+        return a.start_date.localeCompare(b.start_date)
+      })
+      ordered.forEach((it, i) => {
+        tags[it.id] = letter + (i + 1)
+      })
+    }
+  }
+  return tags
+}
+
 // ── WeekRow: renders one 7-day row with spanning item bars ───
 // Bars skip over exception days — rendered as multiple segments
 // so gaps appear on weekends / holidays instead of solid spans.
@@ -478,10 +534,9 @@ function WeekRow({
                   e.stopPropagation()
                   onItemClick(e, item)
                 }}
-                onPointerDown={e => onBarPointerDown && onBarPointerDown(e, item, 'move')}
                 style={{
                   position: 'relative',
-                  cursor: onBarPointerDown ? 'grab' : 'pointer',
+                  cursor: 'pointer',
                   gridRow: lane + 1,
                   gridColumn: `${seg.startCol + 1} / ${seg.endCol + 2}`,
                   backgroundColor: item.needs_crew
@@ -532,12 +587,51 @@ function WeekRow({
                 )}
                 {isFirst && (
                   <>
-                    {item.needs_crew ? null : item.assignee_color ? (
+                    {/* Crew-colored "hand" grip — the ONLY spot that starts a
+                        move-drag. The rest of the bar is click-to-open. Shows the
+                        crew's alphanumeric tag (G1 / G2 …) when this crew's items
+                        overlap, otherwise the bare crew letter. */}
+                    {onBarPointerDown && (
                       <span
-                        className="flex-shrink-0 w-4 h-4 rounded-full border border-white/50 mt-0.5"
-                        style={{ backgroundColor: item.assignee_color }}
-                      />
-                    ) : null}
+                        onPointerDown={e => {
+                          e.stopPropagation()
+                          onBarPointerDown(e, item, 'move')
+                        }}
+                        onClick={e => e.stopPropagation()}
+                        title="Drag to reschedule"
+                        className="flex-shrink-0 flex items-center gap-1 rounded px-1 py-0.5 border border-white/50 select-none mt-0.5"
+                        style={{
+                          cursor: 'grab',
+                          zIndex: 3,
+                          backgroundColor: item.needs_crew
+                            ? 'rgba(255,255,255,0.22)'
+                            : item.assignee_color || item.display_color || '#15803d',
+                          backgroundImage:
+                            'linear-gradient(rgba(255,255,255,0.22),rgba(255,255,255,0.22))',
+                        }}
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          width="11"
+                          height="11"
+                          fill="none"
+                          stroke="#fff"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M18 11V6a2 2 0 0 0-4 0" />
+                          <path d="M14 10V4a2 2 0 0 0-4 0v2" />
+                          <path d="M10 10.5V6a2 2 0 0 0-4 0v8" />
+                          <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+                        </svg>
+                        {item.crewTag && (
+                          <span className="text-white text-[10px] font-bold leading-none">
+                            {item.crewTag}
+                          </span>
+                        )}
+                      </span>
+                    )}
                     <span className="min-w-0 break-words">
                       {displayText}
                       {item.needs_crew && (
@@ -1883,7 +1977,15 @@ export default function ScheduleCalendar({
     const work_days = countWorkDays(preview.start_date, preview.end_date, exceptions, incSat, incSun)
     const { error } = await supabase
       .from('schedule_items')
-      .update({ start_date: preview.start_date, end_date: preview.end_date, work_days })
+      // Stamp updated_at so this just-moved item sorts first within its crew's
+      // overlap group → it becomes crew-tag position 1 (G1), the item it was
+      // dragged over becomes G2, etc. (no DB trigger updates this column).
+      .update({
+        start_date: preview.start_date,
+        end_date: preview.end_date,
+        work_days,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', d.item.id)
     if (error) {
       console.error(error)
@@ -2138,13 +2240,20 @@ export default function ScheduleCalendar({
 
   // While a bar is being dragged/resized, override the dragged item's dates so
   // the bar renders live at its new position before the save round-trips.
-  const renderItems = dragPreview
+  const previewItems = dragPreview
     ? items.map(it =>
         it.id === dragPreview.id
           ? { ...it, start_date: dragPreview.start_date, end_date: dragPreview.end_date }
           : it
       )
     : items
+  // Attach crew-overlap tags (G1 / G2 …) computed off the live (preview) dates,
+  // so dragging a bar into/out of a same-crew overlap re-numbers immediately.
+  const crewLabelMap = Object.fromEntries(crews.map(c => [c.id, (c.label || '').trim()]))
+  const crewTags = computeCrewTags(previewItems, crewLabelMap, dragPreview?.id)
+  const renderItems = previewItems.map(it =>
+    crewTags[it.id] ? { ...it, crewTag: crewTags[it.id] } : it
+  )
 
   // ── Week / Day view helpers ─────────────────────────────────
   const weekStart = (() => {
