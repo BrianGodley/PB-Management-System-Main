@@ -628,9 +628,12 @@ function WeekRow({
                       onBarPointerDown(e, item, 'resize-l')
                     }}
                     onClick={e => e.stopPropagation()}
-                    style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 8, cursor: 'ew-resize', zIndex: 2 }}
+                    className="group/resize"
+                    style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 12, cursor: 'ew-resize', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     title="Drag to change start date"
-                  />
+                  >
+                    <span className="opacity-0 group-hover/resize:opacity-100 transition-opacity" style={{ color: '#fff', fontSize: 18, lineHeight: 1, fontWeight: 900, textShadow: '0 0 3px #1d4ed8, 0 0 2px #1d4ed8' }}>↔</span>
+                  </div>
                 )}
                 {onBarPointerDown && roundRight && (
                   <div
@@ -639,9 +642,12 @@ function WeekRow({
                       onBarPointerDown(e, item, 'resize-r')
                     }}
                     onClick={e => e.stopPropagation()}
-                    style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 8, cursor: 'ew-resize', zIndex: 2 }}
+                    className="group/resize"
+                    style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 12, cursor: 'ew-resize', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     title="Drag to change end date"
-                  />
+                  >
+                    <span className="opacity-0 group-hover/resize:opacity-100 transition-opacity" style={{ color: '#fff', fontSize: 18, lineHeight: 1, fontWeight: 900, textShadow: '0 0 3px #1d4ed8, 0 0 2px #1d4ed8' }}>↔</span>
+                  </div>
                 )}
                 {isFirst && (
                   <>
