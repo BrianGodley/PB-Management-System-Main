@@ -614,9 +614,13 @@ function WeekRow({
                     ? { opacity: 0.35, outline: '2px dashed rgba(0,0,0,0.35)', outlineOffset: '-2px' }
                     : null),
                 }}
-                className="flex items-start gap-1.5 px-2 pt-1.5 pb-1.5 text-white text-sm font-normal cursor-pointer hover:opacity-80 hover:ring-2 hover:ring-inset hover:ring-blue-500 leading-snug"
+                className="group relative flex items-start gap-1.5 px-2 pt-1.5 pb-1.5 text-white text-sm font-normal cursor-pointer hover:ring-2 hover:ring-inset hover:ring-blue-500 leading-snug"
                 title={item.needs_crew ? `${displayText} — Crew not assigned` : displayText}
               >
+                <div
+                  className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ background: 'rgba(147,197,253,0.5)', borderRadius: radius }}
+                />
                 {onBarPointerDown && roundLeft && (
                   <div
                     onPointerDown={e => {
