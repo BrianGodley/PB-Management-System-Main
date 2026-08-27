@@ -116,6 +116,21 @@ function dateStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+// Calendar-day (not working-day) helpers for drag/resize math on 'YYYY-MM-DD' strings.
+const MS_DAY = 86400000
+function toLocalDateStr(ds) {
+  const [y, m, d] = ds.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+function addCalDays(ds, n) {
+  const d = toLocalDateStr(ds)
+  d.setDate(d.getDate() + n)
+  return dateStr(d)
+}
+function calDayDelta(a, b) {
+  return Math.round((toLocalDateStr(b).getTime() - toLocalDateStr(a).getTime()) / MS_DAY)
+}
+
 // Returns true if the date counts as a working day given exceptions + per-item weekend flags
 function isWorkingDay(date, exceptions = [], includeSat = false, includeSun = false) {
   const dow = date.getDay()
@@ -229,6 +244,7 @@ function WeekRow({
   todayStr,
   onDayClick,
   onItemClick,
+  onBarPointerDown,
   exceptions = [],
 }) {
   // weekDays is now an array of 7 Date objects (incl. prev/next-month spillover).
@@ -376,6 +392,7 @@ function WeekRow({
           return (
             <div
               key={col}
+              data-cal-day={dateStr(cellDate)}
               onClick={() => onDayClick(cellDate)}
               className={`border-r border-gray-200
                 ${
@@ -461,7 +478,10 @@ function WeekRow({
                   e.stopPropagation()
                   onItemClick(e, item)
                 }}
+                onPointerDown={e => onBarPointerDown && onBarPointerDown(e, item, 'move')}
                 style={{
+                  position: 'relative',
+                  cursor: onBarPointerDown ? 'grab' : 'pointer',
                   gridRow: lane + 1,
                   gridColumn: `${seg.startCol + 1} / ${seg.endCol + 2}`,
                   backgroundColor: item.needs_crew
@@ -488,6 +508,28 @@ function WeekRow({
                 className="flex items-start gap-1.5 px-2 pt-1.5 pb-1.5 text-white text-sm font-normal cursor-pointer hover:opacity-80 leading-snug"
                 title={item.needs_crew ? `${displayText} — Crew not assigned` : displayText}
               >
+                {onBarPointerDown && roundLeft && (
+                  <div
+                    onPointerDown={e => {
+                      e.stopPropagation()
+                      onBarPointerDown(e, item, 'resize-l')
+                    }}
+                    onClick={e => e.stopPropagation()}
+                    style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 8, cursor: 'ew-resize', zIndex: 2 }}
+                    title="Drag to change start date"
+                  />
+                )}
+                {onBarPointerDown && roundRight && (
+                  <div
+                    onPointerDown={e => {
+                      e.stopPropagation()
+                      onBarPointerDown(e, item, 'resize-r')
+                    }}
+                    onClick={e => e.stopPropagation()}
+                    style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 8, cursor: 'ew-resize', zIndex: 2 }}
+                    title="Drag to change end date"
+                  />
+                )}
                 {isFirst && (
                   <>
                     {item.needs_crew ? null : item.assignee_color ? (
@@ -1690,6 +1732,9 @@ export default function ScheduleCalendar({
 
   function handleItemClick(e, item) {
     if (e) e.stopPropagation()
+    // A drag just finished on this bar — swallow the trailing click so it
+    // doesn't pop the editor modal.
+    if (suppressBarClickRef.current) return
     setEditItem(item)
     setModalJobId(item.job_id)
     // For needs_crew WO items: default to Crew entry so user can immediately assign one
@@ -1765,6 +1810,97 @@ export default function ScheduleCalendar({
       }
       return next
     })
+  }
+
+  // ── Drag-to-move + edge-resize on schedule bars ───────────────────────────
+  // Works WITH the existing modals: a plain click still opens the editor; a
+  // drag past the threshold reschedules (move) or extends/reduces (resize a
+  // left/right edge) and saves straight to schedule_items. Day hit-testing uses
+  // the `data-cal-day` attribute on each calendar cell + elementFromPoint, so it
+  // works across week rows and both the month and week views uniformly.
+  const [dragPreview, setDragPreview] = useState(null) // { id, start_date, end_date }
+  const dragRef = useRef(null)
+  const dragPreviewRef = useRef(null)
+  const suppressBarClickRef = useRef(false)
+
+  function dayFromPoint(x, y) {
+    // elementsFromPoint (plural) returns the full stack so we find the day cell
+    // even when a bar sits on top of it mid-drag.
+    const els = document.elementsFromPoint ? document.elementsFromPoint(x, y) : []
+    for (const el of els) {
+      const cell = el.closest ? el.closest('[data-cal-day]') : null
+      if (cell) return cell.getAttribute('data-cal-day')
+    }
+    return null
+  }
+
+  function onBarPointerMove(e) {
+    const d = dragRef.current
+    if (!d) return
+    if (!d.moved && Math.abs(e.clientX - d.downX) < 4 && Math.abs(e.clientY - d.downY) < 4) return
+    d.moved = true
+    const day = dayFromPoint(e.clientX, e.clientY)
+    if (!day) return
+    let ns = d.origStart,
+      ne = d.origEnd
+    if (d.mode === 'move') {
+      const shift = calDayDelta(d.grabDay, day)
+      ns = addCalDays(d.origStart, shift)
+      ne = addCalDays(d.origEnd, shift)
+    } else if (d.mode === 'resize-l') {
+      ns = calDayDelta(day, d.origEnd) >= 0 ? day : d.origEnd
+    } else if (d.mode === 'resize-r') {
+      ne = calDayDelta(d.origStart, day) >= 0 ? day : d.origStart
+    }
+    const preview = { id: d.item.id, start_date: ns, end_date: ne }
+    dragPreviewRef.current = preview
+    setDragPreview(preview)
+  }
+
+  async function onBarPointerUp() {
+    const d = dragRef.current
+    window.removeEventListener('pointermove', onBarPointerMove)
+    window.removeEventListener('pointerup', onBarPointerUp)
+    dragRef.current = null
+    const preview = dragPreviewRef.current
+    dragPreviewRef.current = null
+    setDragPreview(null)
+    if (!d || !d.moved || !preview) return
+    // Suppress the click-to-open-modal that fires right after a drag.
+    suppressBarClickRef.current = true
+    setTimeout(() => {
+      suppressBarClickRef.current = false
+    }, 60)
+    const incSat = d.item.include_saturday || false
+    const incSun = d.item.include_sunday || false
+    const work_days = countWorkDays(preview.start_date, preview.end_date, exceptions, incSat, incSun)
+    const { error } = await supabase
+      .from('schedule_items')
+      .update({ start_date: preview.start_date, end_date: preview.end_date, work_days })
+      .eq('id', d.item.id)
+    if (error) {
+      console.error(error)
+      alert('Failed to reschedule: ' + error.message)
+    }
+    fetchItems()
+  }
+
+  function onBarPointerDown(e, item, mode) {
+    if (e.button !== 0) return
+    e.stopPropagation()
+    const grabDay = dayFromPoint(e.clientX, e.clientY) || item.start_date
+    dragRef.current = {
+      item,
+      mode,
+      grabDay,
+      origStart: item.start_date,
+      origEnd: item.end_date,
+      downX: e.clientX,
+      downY: e.clientY,
+      moved: false,
+    }
+    window.addEventListener('pointermove', onBarPointerMove)
+    window.addEventListener('pointerup', onBarPointerUp)
   }
 
   // Insert an Administrative schedule item (crew time off / supervisor
@@ -1992,6 +2128,16 @@ export default function ScheduleCalendar({
 
   const jobMap = Object.fromEntries(jobs.map(j => [j.id, j.name || j.client_name]))
   const todayStr = dateStr(today)
+
+  // While a bar is being dragged/resized, override the dragged item's dates so
+  // the bar renders live at its new position before the save round-trips.
+  const renderItems = dragPreview
+    ? items.map(it =>
+        it.id === dragPreview.id
+          ? { ...it, start_date: dragPreview.start_date, end_date: dragPreview.end_date }
+          : it
+      )
+    : items
 
   // ── Week / Day view helpers ─────────────────────────────────
   const weekStart = (() => {
@@ -2367,12 +2513,13 @@ export default function ScheduleCalendar({
                 weekDays={weekDays}
                 year={year}
                 month={month}
-                items={items}
+                items={renderItems}
                 selectedJob={selectedJob}
                 jobMap={jobMap}
                 todayStr={todayStr}
                 onDayClick={handleDayClick}
                 onItemClick={handleItemClick}
+                onBarPointerDown={onBarPointerDown}
                 exceptions={exceptions}
               />
             ))}
