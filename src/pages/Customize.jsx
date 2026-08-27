@@ -6,7 +6,7 @@
 //   • Pick a color for the left menu bar (or Clear to keep it transparent).
 // Saved per-user (synced across devices) + cached in localStorage so the
 // Layout applies it per route / to the sidebar.
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -26,6 +26,7 @@ import {
   MENU_POS_KEY,
   MENU_POSITIONS,
   MENU_GROUPS_KEY,
+  MENU_ORDER_KEY,
   MENU_ITEMS,
   buildMenuStructure,
   sidebarNavColor,
@@ -114,13 +115,54 @@ const PREVIEW_ITEMS = MENU_ITEMS.map(i => ({ ...i, icon: PREVIEW_ICONS[i.path] |
 // visibility, bar color, custom groups, and — when the bar is Clear — the
 // user's current page background (so they see how Clear actually looks). All
 // previews share one fixed width/height so they line up identically.
-function MenuPreview({ font, showIcons, barColor, bgUrl, bgSwatch, bgDark, groups }) {
+function MenuPreview({ font, showIcons, barColor, bgUrl, bgSwatch, bgDark, groups, order, pos = 'left' }) {
   const clear = !barColor
   const baseColor = clear ? (bgSwatch || '#eceef1') : barColor
   const textColor = clear
     ? (bgDark ? '#ffffff' : '#1f2937')
     : (sidebarNavColor(barColor).text || '#ffffff')
-  const structure = buildMenuStructure(PREVIEW_ITEMS, groups || [])
+  const structure = buildMenuStructure(PREVIEW_ITEMS, groups || [], order)
+  const horizontal = pos === 'top' || pos === 'bottom'
+  const bgStyle = {
+    backgroundColor: baseColor,
+    backgroundImage: clear && bgUrl ? `url(${bgUrl})` : undefined,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+  }
+
+  // Horizontal bar (Top / Bottom): entries flow left→right; groups become
+  // dropdown chips (▾), matching how the real Top/Bottom menus render.
+  if (horizontal) {
+    const Chip = ({ item }) => (
+      <div className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 whitespace-nowrap">
+        {showIcons && <span className="text-sm leading-none">{item.icon}</span>}
+        <span style={{ color: textColor, ...sidebarFontStyle(font) }}>{item.label}</span>
+      </div>
+    )
+    return (
+      <div className="rounded-md border border-gray-200 w-full overflow-x-auto" style={bgStyle}>
+        <div className="flex items-center gap-1 p-2">
+          {structure.map(e =>
+            e.type === 'single' ? (
+              <Chip key={e.item.path} item={e.item} />
+            ) : (
+              <div
+                key={e.id}
+                className="flex items-center gap-1 rounded-md px-2.5 py-1.5 border border-white/25 whitespace-nowrap"
+              >
+                <span className="font-bold text-[11px] uppercase tracking-wide" style={{ color: textColor }}>
+                  {e.label}
+                </span>
+                <span className="text-[10px] opacity-60" style={{ color: textColor }}>▾</span>
+              </div>
+            )
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Vertical sidebar (Left / Right — identical): stacked rows, groups as sections.
   const Row = ({ item, indent }) => (
     <div className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 ${indent ? 'ml-3' : ''}`}>
       {showIcons && <span className="text-sm leading-none w-4 text-center">{item.icon}</span>}
@@ -128,15 +170,7 @@ function MenuPreview({ font, showIcons, barColor, bgUrl, bgSwatch, bgDark, group
     </div>
   )
   return (
-    <div
-      className="rounded-md w-fit min-w-[11rem] border border-gray-200"
-      style={{
-        backgroundColor: baseColor,
-        backgroundImage: clear && bgUrl ? `url(${bgUrl})` : undefined,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      }}
-    >
+    <div className="rounded-md w-fit min-w-[11rem] border border-gray-200" style={bgStyle}>
       <div className="p-2">
         {structure.map(e =>
           e.type === 'single' ? (
@@ -232,6 +266,7 @@ export default function Customize() {
   const font = map[SIDEBAR_FONT_KEY] || {}
   const menuPos = map[MENU_POS_KEY] || 'left'
   const menuGroups = map[MENU_GROUPS_KEY] || []
+  const menuOrder = map[MENU_ORDER_KEY] || []
   const byPath = Object.fromEntries(MENU_ITEMS.map(i => [i.path, i]))
   const groupNameByPath = {}
   menuGroups.forEach(g => (g.items || []).forEach(p => { groupNameByPath[p] = g.name }))
@@ -250,6 +285,8 @@ export default function Customize() {
     bgSwatch: previewBg.swatch,
     bgDark: previewBg.dark,
     groups: menuGroups,
+    order: menuOrder,
+    pos: menuPos,
   }
 
   function pickBackground(bgId) {
@@ -449,10 +486,46 @@ export default function Customize() {
     setGroups(gs => gs.map(g => (g.id === id ? { ...g, items: (g.items || []).filter(p => p !== path) } : g)))
   }
 
-  async function handleSave() {
+  // ── Menu order (Placement) drag-and-drop reordering ──
+  const [orderEditing, setOrderEditing] = useState(false)
+  const [orderDraft, setOrderDraft] = useState([]) // tokens: path | 'group:<id>'
+  const dragTokRef = useRef(null)
+  function currentOrderTokens() {
+    return buildMenuStructure(PREVIEW_ITEMS, menuGroups, menuOrder).map(e =>
+      e.type === 'group' ? `group:${e.id}` : e.item.path
+    )
+  }
+  function tokenLabel(tok) {
+    if (tok.startsWith('group:')) {
+      const g = menuGroups.find(gg => `group:${gg.id}` === tok)
+      return g ? `${g.name}  ·  group` : tok
+    }
+    return byPath[tok]?.label || tok
+  }
+  function beginOrderEdit() {
+    setOrderDraft(currentOrderTokens())
+    setOrderEditing(true)
+  }
+  function moveToken(from, to) {
+    setOrderDraft(prev => {
+      const arr = [...prev]
+      const [m] = arr.splice(from, 1)
+      arr.splice(to, 0, m)
+      return arr
+    })
+  }
+  function saveOrderEdit() {
+    const nextMap = { ...map, [MENU_ORDER_KEY]: orderDraft }
+    setMap(nextMap)
+    setOrderEditing(false)
+    handleSave(nextMap)
+  }
+
+  async function handleSave(mapArg) {
+    const saveMap = mapArg && !mapArg.nativeEvent ? mapArg : map
     setSaving(true)
     try {
-      localStorage.setItem(MODULE_BG_LS_KEY, JSON.stringify(map))
+      localStorage.setItem(MODULE_BG_LS_KEY, JSON.stringify(saveMap))
       window.dispatchEvent(new Event('module-backgrounds-updated'))
     } catch {
       /* ignore */
@@ -463,7 +536,7 @@ export default function Customize() {
       const { error } = await supabase
         .from('dashboard_preferences')
         .upsert(
-          { user_id: user.id, module_backgrounds: map, updated_at: new Date().toISOString() },
+          { user_id: user.id, module_backgrounds: saveMap, updated_at: new Date().toISOString() },
           { onConflict: 'user_id' }
         )
       ok = !error
@@ -751,14 +824,85 @@ export default function Customize() {
                 + Add group
               </button>
             </div>
-            {/* preview */}
+            {/* placement — reflects the chosen bar (vertical for Left/Right,
+                horizontal for Top/Bottom) and lets you drag the order. */}
             <div>
-              <p className="text-xs font-semibold text-gray-500 mb-1.5">Preview</p>
-              <MenuPreview {...previewProps} />
-              <p className="text-[11px] text-gray-400 mt-1.5">
-                Ungrouped items appear on their own; groups show as sections here (pop-up menus in the
-                sidebar, dropdowns in the Top/Bottom menus).
-              </p>
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-xs font-semibold text-gray-500">
+                  Placement{' '}
+                  <span className="font-normal text-gray-400">
+                    (
+                    {menuPos === 'top'
+                      ? 'Top bar'
+                      : menuPos === 'bottom'
+                        ? 'Bottom bar'
+                        : menuPos === 'right'
+                          ? 'Right sidebar'
+                          : 'Left sidebar'}
+                    )
+                  </span>
+                </p>
+                {!orderEditing ? (
+                  <button
+                    onClick={beginOrderEdit}
+                    className="text-xs font-semibold text-green-700 border border-green-300 rounded-md px-2.5 py-1 hover:bg-green-50"
+                  >
+                    ✎ Edit order
+                  </button>
+                ) : (
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => setOrderEditing(false)}
+                      className="text-xs text-gray-500 px-2 py-1 rounded-md hover:bg-gray-100"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveOrderEdit}
+                      className="text-xs font-semibold text-white bg-green-700 rounded-md px-3 py-1 hover:bg-green-800"
+                    >
+                      💾 Save
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {orderEditing ? (
+                <div>
+                  <p className="text-[11px] text-gray-400 mb-1.5">
+                    Drag to set the order — top of the list is first on the bar.
+                  </p>
+                  <div className="space-y-1.5">
+                    {orderDraft.map((tok, idx) => (
+                      <div
+                        key={tok}
+                        draggable
+                        onDragStart={() => (dragTokRef.current = idx)}
+                        onDragOver={e => e.preventDefault()}
+                        onDrop={() => {
+                          if (dragTokRef.current != null && dragTokRef.current !== idx)
+                            moveToken(dragTokRef.current, idx)
+                          dragTokRef.current = null
+                        }}
+                        className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm cursor-grab active:cursor-grabbing hover:border-green-300"
+                      >
+                        <span className="text-gray-300 select-none">⋮⋮</span>
+                        <span className="text-gray-400 w-5 text-right tabular-nums">{idx + 1}.</span>
+                        <span className="text-gray-800 truncate">{tokenLabel(tok)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <MenuPreview {...previewProps} />
+                  <p className="text-[11px] text-gray-400 mt-1.5">
+                    Ungrouped items appear on their own; groups show as sections (pop-up menus in the
+                    sidebar, dropdowns in the Top/Bottom menus). Use <strong>Edit order</strong> to
+                    drag items into the order you want, then Save.
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>

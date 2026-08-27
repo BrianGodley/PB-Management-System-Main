@@ -15,6 +15,7 @@ import {
   SIDEBAR_FONT_KEY,
   MENU_POS_KEY,
   MENU_GROUPS_KEY,
+  MENU_ORDER_KEY,
   buildMenuStructure,
   sidebarFontStyle,
   sidebarNavColor,
@@ -291,6 +292,13 @@ export default function Layout() {
       return []
     }
   })
+  const [menuOrder, setMenuOrder] = useState(() => {
+    try {
+      return readModuleBackgrounds()[MENU_ORDER_KEY] || []
+    } catch {
+      return []
+    }
+  })
   // Sidebar group popup (Left/Right modes): clicking a group title opens a
   // floating menu of its items, mirroring the Top/Bottom dropdowns. Rendered
   // via a body portal (fixed-position) so the sidebar's overflow can't clip it.
@@ -386,6 +394,7 @@ export default function Layout() {
         setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false); setSidebarFont(map[SIDEBAR_FONT_KEY] || null)
         setMenuPos(map[MENU_POS_KEY] || 'left')
         setMenuGroups(map[MENU_GROUPS_KEY] || [])
+        setMenuOrder(map[MENU_ORDER_KEY] || [])
         setHeaderItems(readHeaderItems(map))
         const _id1 = bgIdForPath(window.location.pathname, map)
         setCurrentBgId(_id1)
@@ -403,6 +412,7 @@ export default function Layout() {
     setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false); setSidebarFont(map[SIDEBAR_FONT_KEY] || null)
     setMenuPos(map[MENU_POS_KEY] || 'left')
     setMenuGroups(map[MENU_GROUPS_KEY] || [])
+    setMenuOrder(map[MENU_ORDER_KEY] || [])
     setHeaderItems(readHeaderItems(map))
     const _id2 = bgIdForPath(location.pathname, map)
     setCurrentBgId(_id2)
@@ -417,6 +427,7 @@ export default function Layout() {
       setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false); setSidebarFont(map[SIDEBAR_FONT_KEY] || null)
       setMenuPos(map[MENU_POS_KEY] || 'left')
       setMenuGroups(map[MENU_GROUPS_KEY] || [])
+      setMenuOrder(map[MENU_ORDER_KEY] || [])
       setHeaderItems(readHeaderItems(map))
       const _id3 = bgIdForPath(window.location.pathname, map)
       setCurrentBgId(_id3)
@@ -458,7 +469,7 @@ export default function Layout() {
     // Paid extensions enabled for this tenant contribute their own nav entries.
     ...getExtensionModules(activeExtensions).map(m => ({ path: m.path, label: m.label, icon: m.icon })),
   ]
-  const menuStructure = buildMenuStructure(allowedNav, menuGroups)
+  const menuStructure = buildMenuStructure(allowedNav, menuGroups, menuOrder)
   // Route guard: if the current path belongs to a module the plan doesn't
   // include, block the page (show an upgrade notice) instead of rendering it.
   const blockedModule = navItems.find(

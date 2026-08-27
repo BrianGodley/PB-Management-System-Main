@@ -110,6 +110,10 @@ export const MENU_POSITIONS = [
 // Items not listed in any group render on their own (flat). Empty default =
 // no custom grouping (the menu uses its built-in layout per position).
 export const MENU_GROUPS_KEY = '__menuGroups'
+// User-defined order of the top-level menu entries. An array of tokens: a nav
+// path (e.g. '/jobs') for an ungrouped item, or 'group:<id>' for a group block.
+// Anything not listed keeps its default position after the listed entries.
+export const MENU_ORDER_KEY = '__menuOrder'
 
 // Canonical menu items (path + label) for the grouping editor. The paths match
 // Layout's navItems so a group's saved paths resolve to the real nav entries.
@@ -140,20 +144,40 @@ export const MENU_ITEMS = [
 // then each non-empty group (as { type:'group', id, label, items:[...] }) in
 // the order the user created them. `items` are the caller's nav objects
 // (keyed by `.path`), so icons/labels come straight from the live nav.
-export function buildMenuStructure(items, groups) {
+export function buildMenuStructure(items, groups, order) {
   const byPath = Object.fromEntries((items || []).map(i => [i.path, i]))
   const grouped = new Set()
-  const groupEntries = []
+  const groupById = {}
   for (const g of groups || []) {
     const resolved = (g.items || [])
       .map(p => { grouped.add(p); return byPath[p] })
       .filter(Boolean)
-    if (resolved.length) groupEntries.push({ type: 'group', id: g.id, label: g.name, items: resolved })
+    groupById[g.id] = resolved.length
+      ? { type: 'group', id: g.id, label: g.name, items: resolved }
+      : null
   }
-  const singles = (items || [])
-    .filter(i => !grouped.has(i.path))
-    .map(i => ({ type: 'single', item: i }))
-  return [...singles, ...groupEntries]
+  // Default order: ungrouped items (in items order), then groups (in groups order).
+  const defaultEntries = [
+    ...(items || []).filter(i => !grouped.has(i.path)).map(i => ({ type: 'single', item: i })),
+    ...(groups || []).map(g => groupById[g.id]).filter(Boolean),
+  ]
+  if (!Array.isArray(order) || order.length === 0) return defaultEntries
+
+  // Honor the user's saved order (tokens: path | 'group:<id>'); then append any
+  // entries not referenced (newly added items/groups) so nothing disappears.
+  const tokenOf = e => (e.type === 'group' ? `group:${e.id}` : e.item.path)
+  const byToken = Object.fromEntries(defaultEntries.map(e => [tokenOf(e), e]))
+  const seen = new Set()
+  const ordered = []
+  for (const tok of order) {
+    const e = byToken[tok]
+    if (e && !seen.has(tok)) { ordered.push(e); seen.add(tok) }
+  }
+  for (const e of defaultEntries) {
+    const tok = tokenOf(e)
+    if (!seen.has(tok)) { ordered.push(e); seen.add(tok) }
+  }
+  return ordered
 }
 
 // A broad set of the fonts that ship with Microsoft Office / Windows, in the
