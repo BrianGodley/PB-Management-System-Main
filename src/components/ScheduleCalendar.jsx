@@ -2774,7 +2774,9 @@ export default function ScheduleCalendar({
           MOBILE VIEW — hidden on lg+ screens
       ══════════════════════════════════════════════════════ */}
       <div className="lg:hidden flex flex-col">
-        <MonthNav />
+        <div className="relative z-40">
+          <MonthNav />
+        </div>
 
         {/* Add button */}
         <button
@@ -2826,7 +2828,7 @@ export default function ScheduleCalendar({
                 Sat: spacer
               items-center keeps every control on the same vertical center. */}
           <div
-            className="grid items-center gap-0 mb-2 h-12"
+            className="relative z-40 grid items-center gap-0 mb-2 h-12"
             style={{ gridTemplateColumns: GRID_COLS }}
           >
             {/* Sun — spacer */}
