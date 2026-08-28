@@ -2549,7 +2549,16 @@ export default function ScheduleCalendar({
   )
   // During a MOVE: which bar is lifted (dimmed) + which day is the drop target.
   const liftedId = dragMode === 'move' ? dragPreview?.id : null
-  const dropTargetDay = dragMode === 'move' ? dragPreview?.start_date : null
+  // Highlight the landing day: on MOVE = the new start day; on RESIZE = the edge
+  // being dragged (new start for resize-l, new end for resize-r).
+  const dropTargetDay =
+    dragMode === 'move'
+      ? dragPreview?.start_date
+      : dragMode === 'resize-l'
+        ? dragPreview?.start_date
+        : dragMode === 'resize-r'
+          ? dragPreview?.end_date
+          : null
   // The floating ghost's label (source item captured at drag start).
   const ghostItem = dragMode === 'move' ? dragRef.current?.item : null
 
