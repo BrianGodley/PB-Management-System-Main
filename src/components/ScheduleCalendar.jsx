@@ -3166,6 +3166,31 @@ export default function ScheduleCalendar({
         </div>
       )}
 
+      {/* ── Resize edge arrow: while expanding/contracting an edge, a blue up-arrow
+             hovers above the corner being dragged (left handle → left corner,
+             right handle → right corner). Mirrors the move-drag ghost arrow. ── */}
+      {dragPos && (dragMode === 'resize-l' || dragMode === 'resize-r') && (
+        <div
+          style={{
+            position: 'fixed',
+            left: dragPos.x + (dragMode === 'resize-r' ? 4 : -30),
+            top: dragPos.y - 42,
+            zIndex: 9999,
+            pointerEvents: 'none',
+          }}
+        >
+          <svg
+            width="26"
+            height="30"
+            viewBox="0 0 24 30"
+            fill="#2563eb"
+            style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))' }}
+          >
+            <path d="M12 0 l8 10 h-5 v14 h-6 v-14 h-5 z" />
+          </svg>
+        </div>
+      )}
+
       {/* ── Modals (shared by both mobile and desktop) ────────── */}
 
       {/* Workday Exceptions */}
