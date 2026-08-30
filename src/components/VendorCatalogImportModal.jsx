@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { pdfjs } from 'react-pdf'
+import { PDF_OPTIONS } from '../lib/pdfOptions'
 import { supabase } from '../lib/supabase'
 import { supersedeMaterialPrice, resolveTaxonomyIds } from '../lib/materialCatalog'
 import VendorCombo from './VendorCombo'
@@ -254,7 +255,7 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
     if (isPdf) {
       if (!pdfRef.current) {
         const buf = await file.arrayBuffer()
-        pdfRef.current = await pdfjs.getDocument({ data: buf }).promise
+        pdfRef.current = await pdfjs.getDocument({ data: buf, ...PDF_OPTIONS }).promise
       }
       const page = await pdfRef.current.getPage(pageNum)
       const viewport = page.getViewport({ scale: 2 })
@@ -410,7 +411,7 @@ export default function VendorCatalogImportModal({ vendors = [], onClose, onImpo
       let np = 1
       if (isPdf) {
         const buf = await file.arrayBuffer()
-        pdfRef.current = await pdfjs.getDocument({ data: buf }).promise
+        pdfRef.current = await pdfjs.getDocument({ data: buf, ...PDF_OPTIONS }).promise
         np = pdfRef.current.numPages || 1
       }
       // Restore a saved draft for this exact file, if present — otherwise fresh.

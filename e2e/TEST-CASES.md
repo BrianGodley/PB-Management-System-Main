@@ -39,6 +39,17 @@ deletes, no rate edits, no SQL.
   `/collections`, Statistics `/statistics`, Master Rates `/master-rates`, Admin
   `/admin`. (Caught the real `/tracker` 400 — `id=eq.undefined` — now fixed.)
 
+### `security.spec.js` — audit-hardening regressions (NON-DESTRUCTIVE)
+- **return_to=<payload> does not leave the origin** — four payloads (`//example.com`,
+  `/\example.com`, `https://example.com`, `javascript:alert(1)`) against
+  `TEST_ESTIMATE_URL`; each must stay on the app origin. Guards the
+  `safeInternalPath()` fix for the open redirect at `EstimateDetail.jsx:100`.
+  Only the load half is exercised — the redirect fires after a change-order bid
+  is created, which the suite must never do against prod.
+- **e-documents list renders a PDF preview** — `/edocuments` paints a `<canvas>`
+  (or reports an empty list). Regression guard for `isEvalSupported: false`
+  (GHSA-wgrm-67xf-hhpq) breaking pdf.js font/CMap rendering.
+
 ### `code-changes.spec.js` — Admin → Code Changes (the git-history tab)
 - **tab opens and lists code changes** — heading + rows (or the "run the SQL"
   notice), plus a total count.

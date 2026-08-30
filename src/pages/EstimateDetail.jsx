@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { fetchGlobalGpmd, DEFAULT_ESTIMATE_GPMD } from '../lib/companyDefaults'
+import { safeInternalPath } from '../lib/safeInternalPath'
 import { useRateIcons } from '../contexts/RateIconsContext'
 import ErrorBoundary from '../components/ErrorBoundary'
 const DrainageModule = lazy(() => import('../components/modules/DrainageModule'))
@@ -95,7 +96,8 @@ export default function EstimateDetail() {
   const coJobId = searchParams.get('job_id') || null
   const coName = searchParams.get('co_name') || ''
   const coType = searchParams.get('co_type') || ''
-  const returnTo = searchParams.get('return_to') || null
+  // Comes straight from the query string, so it is only usable after validation.
+  const returnTo = safeInternalPath(searchParams.get('return_to'))
   const [estimate, setEstimate] = useState(null)
   const [projects, setProjects] = useState([])
   // All versions in this estimate's tree (root + children), for the version

@@ -14,6 +14,7 @@
 // (Edit template, open document, send) are wired as clearly-labelled stubs.
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
+import { PDF_OPTIONS } from '../lib/pdfOptions'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import EDocFieldEditor from '../components/edoc/EDocFieldEditor'
@@ -43,7 +44,7 @@ function PdfThumb({ pdfPath, height = 160 }) {
   if (!url) return placeholder
   return (
     <div className="w-full overflow-hidden bg-gray-100 flex items-start justify-center" style={{ height }}>
-      <Document file={url} loading={placeholder} error={placeholder}>
+      <Document file={url} options={PDF_OPTIONS} loading={placeholder} error={placeholder}>
         <Page pageNumber={1} height={height} renderTextLayer={false} renderAnnotationLayer={false} />
       </Document>
     </div>

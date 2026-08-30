@@ -9,12 +9,13 @@
 // pdfjs comes from react-pdf (same instance the rest of the app uses) so the
 // worker version always matches what's already configured elsewhere.
 import { pdfjs } from 'react-pdf'
+import { PDF_OPTIONS } from './pdfOptions'
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`
 
 async function extractPdf(file) {
   const buf = await file.arrayBuffer()
-  const pdf = await pdfjs.getDocument({ data: buf }).promise
+  const pdf = await pdfjs.getDocument({ data: buf, ...PDF_OPTIONS }).promise
   const pages = []
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i)

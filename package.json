@@ -45,6 +45,8 @@
     "e2e:autopush": "node scripts/e2e-autopush.mjs",
     "e2e:auto": "node scripts/e2e-auto.mjs",
     "import-code-changes": "node scripts/import-code-changes.mjs",
+    "env:staging": "node scripts/make-staging-env.mjs",
+    "scan:dump": "node scripts/scan-dump-secrets.mjs",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write \"src/**/*.{js,jsx,css}\"",
@@ -84,7 +86,7 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.14",
     "globals": "^15.12.0",
-    "postcss": "^8.4.32",
+    "postcss": "^8.5.26",
     "prettier": "^3.3.3",
     "tailwindcss": "^3.4.0",
     "vite": "^5.0.8"

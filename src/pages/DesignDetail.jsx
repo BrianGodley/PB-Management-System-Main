@@ -15,6 +15,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Document, Page, pdfjs } from 'react-pdf'
+import { PDF_OPTIONS } from '../lib/pdfOptions'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 import { supabase } from '../lib/supabase'
@@ -1223,6 +1224,7 @@ export default function DesignDetail() {
                 >
                   {isPdfFile(selectedFile) ? (
                     <Document
+                      options={PDF_OPTIONS}
                       file={signedUrl}
                       onLoadSuccess={onPdfLoad}
                       onLoadError={err => setError('PDF load failed: ' + err.message)}

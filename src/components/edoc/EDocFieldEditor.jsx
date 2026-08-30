@@ -9,6 +9,7 @@
 //   [{ id, page, xPct, yPct, wPct, hPct, type, role, label, key, required }]
 import { useState } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
+import { PDF_OPTIONS } from '../../lib/pdfOptions'
 import { supabase } from '../../lib/supabase'
 
 // Worker from cdnjs (same CDN pattern the app uses for Leaflet). pdfjs.version
@@ -314,6 +315,7 @@ export default function EDocFieldEditor({ template, onClose, onSaved }) {
           </div>
         ) : (
           <Document
+            options={PDF_OPTIONS}
             file={url}
             onLoadSuccess={({ numPages: n }) => setNumPages(n)}
             onLoadError={e => setLoadError(e?.message || 'Unknown error')}

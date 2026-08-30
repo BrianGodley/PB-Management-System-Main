@@ -8,6 +8,7 @@
 // Field shape: { id, page, xPct, yPct, wPct, hPct, type, label }
 import { useState } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
+import { PDF_OPTIONS } from '../../lib/pdfOptions'
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`
 
@@ -182,6 +183,7 @@ export default function PdfFieldEditor({ url, title = 'PDF', initialFields = [],
           <div className="text-center text-sm text-red-600 bg-white rounded-lg p-6 max-w-md mx-auto">Couldn't load the PDF. {loadError}</div>
         ) : (
           <Document
+            options={PDF_OPTIONS}
             file={url}
             onLoadSuccess={({ numPages: n }) => setNumPages(n)}
             onLoadError={e => setLoadError(e?.message || 'Unknown error')}
