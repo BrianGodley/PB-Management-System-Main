@@ -346,3 +346,16 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   estimator view) and the selectors need a real DOM to harden against. Verify manually by
   opening an estimator-built change order and confirming the buttons appear and gate by
   status; then this becomes a spec.
+
+## CODetailModal — removed the superseded email/text handlers
+
+- `handleEmail` and `handleText` (added 2026-05-13, "Change Orders rebuild … print/email/text")
+  were replaced a month later by the shared `CONotifyDialog` flow in cd2f7aa7, but left in
+  place. Both were unreferenced — no button, no caller — for three months.
+- They mattered because `handleText` was one of the three call sites carrying the
+  `{to, body}` vs `{to, message}` payload bug. It survived precisely BECAUSE it was
+  unreachable: nobody could trigger it, so nobody saw the failure. Dead code is where bugs
+  go to hide from testing.
+- Removed 56 lines. Lint on the file is now 0 errors / 0 unused symbols.
+- NOT touched: `WorkOrders.jsx` has its own `handleEmail`/`handleText`, both wired to real
+  buttons. Same names, different component, still live.

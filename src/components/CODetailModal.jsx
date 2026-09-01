@@ -512,62 +512,6 @@ export default function CODetailModal({
     onSent && onSent()
   }
 
-  // ── Email: send-email edge function with the same printable HTML ─────────
-  async function handleEmail() {
-    if (!coState) return
-    const to = prompt('Email address to send to:')
-    if (!to || !to.includes('@')) return
-    setSaving(true)
-    setError('')
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email`
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to,
-          subject: `Change Order #${coState.custom_co_id || ''}: ${coState.co_name}`,
-          html: buildPrintableHtml(coState, job),
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok || data.success === false) throw new Error(data.error || `HTTP ${res.status}`)
-      alert('Sent!')
-      onSent && onSent()
-    } catch (e) {
-      setError('Email failed: ' + (e instanceof Error ? e.message : String(e)))
-    }
-    setSaving(false)
-  }
-
-  // ── Text: send-sms function (stub-friendly — won't crash if not deployed)
-  async function handleText() {
-    if (!coState) return
-    const to = prompt('Phone number (e.g. +14155550100):')
-    if (!to) return
-    setSaving(true)
-    setError('')
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      const message = `${job.client_name || job.name}: Change Order #${coState.custom_co_id || ''} — "${coState.co_name}" — Amount: $${Number(coState.bid_amount || 0).toLocaleString()}.`
-      const { data, error: smsErr } = await sendSMS({ to, message })
-      if (smsErr || data?.success === false) throw new Error(smsErr?.message || data?.error || 'SMS failed')
-      alert('Text sent!')
-      onSent && onSent()
-    } catch (e) {
-      setError('Text failed: ' + (e instanceof Error ? e.message : String(e)))
-    }
-    setSaving(false)
-  }
-
   return (
     <>
       <div
