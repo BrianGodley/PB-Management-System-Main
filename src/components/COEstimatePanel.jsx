@@ -762,10 +762,64 @@ export default function COEstimatePanel({
 
   return (
     <div className="flex flex-col h-full">
+      {/* Release / Resend notification dialog — shared with CODetailModal */}
+      {notifyMode && (
+        <CONotifyDialog
+          mode={notifyMode}
+          saving={lifecycleBusy}
+          onCancel={() => setNotifyMode(null)}
+          onSend={handleNotifySend}
+        />
+      )}
       {/* CO header */}
       <div className="mb-3">
         {/* Small Save + close X */}
         <div className="flex items-center justify-end gap-2 mb-2">
+          {!isNew && isUnreleased && (
+            <button
+              onClick={() => setNotifyMode('release')}
+              disabled={lifecycleBusy}
+              className="text-xs px-3 py-1.5 rounded-lg font-semibold disabled:opacity-50 bg-blue-700 text-white hover:bg-blue-800"
+            >
+              📤 Release
+            </button>
+          )}
+          {!isNew && isReleased && (
+            <button
+              onClick={() => setNotifyMode('resend')}
+              disabled={lifecycleBusy}
+              className="text-xs px-3 py-1.5 rounded-lg font-semibold disabled:opacity-50 border border-blue-200 text-blue-700 hover:bg-blue-50"
+            >
+              Resend
+            </button>
+          )}
+          {!isNew && isReleased && (
+            <button
+              onClick={handleUnrelease}
+              disabled={lifecycleBusy}
+              className="text-xs px-3 py-1.5 rounded-lg font-semibold disabled:opacity-50 border border-gray-300 text-gray-700 hover:bg-gray-50"
+            >
+              Unrelease
+            </button>
+          )}
+          {!isNew && (
+            <button
+              onClick={handlePrintCO}
+              disabled={lifecycleBusy}
+              className="text-xs px-3 py-1.5 rounded-lg font-semibold disabled:opacity-50 border border-gray-300 text-gray-700 hover:bg-gray-50"
+            >
+              🖨️ Print
+            </button>
+          )}
+          {!isNew && (
+            <button
+              onClick={handleDeleteCO}
+              disabled={lifecycleBusy}
+              className="text-xs px-3 py-1.5 rounded-lg font-semibold disabled:opacity-50 border border-red-200 text-red-500 hover:bg-red-50"
+            >
+              Delete
+            </button>
+          )}
           <button
             onClick={handleSaveCO}
             disabled={savingCO}

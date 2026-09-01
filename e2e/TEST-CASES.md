@@ -327,3 +327,22 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   reconciled correctly and no user ever saw a defect. The real cost was the console noise
   masking genuine errors on that page.
 - Verified: navigation.spec.js Collections case passes; full navigation suite 9/9 green.
+
+## COEstimatePanel — release lifecycle wired up (completing cd2f7aa7)
+
+- Commit cd2f7aa7 (2026-06-12) built the full change-order release lifecycle for the
+  ESTIMATOR panel — `handleNotifySend`, `handleUnrelease`, `handleDeleteCO`,
+  `handlePrintCO`, the `notifyMode`/`lifecycleBusy`/`isReleased` state, and an import of
+  the shared `CONotifyDialog` — but never added the buttons. All four handlers sat
+  unreferenced for three months, so a change order could be released, resent, unreleased,
+  deleted and printed when opened from the jobs list (CODetailModal) but NOT when opened
+  in the estimator, even though the code to do it existed.
+- Now wired: 📤 Release (unreleased only), Resend + Unrelease (released only), 🖨️ Print and
+  Delete (any saved CO), all disabled while `lifecycleBusy`. Status gating mirrors
+  CODetailModal so the two screens behave identically. `CONotifyDialog` is now mounted.
+- Lint on the file went from 7 unused symbols to 1 (an unrelated `projectSubRates`),
+  which is the mechanical confirmation that the previously-dead code is now reachable.
+- NOT yet exercised in a browser: reaching the panel is a deep path (JobsList → job → CO →
+  estimator view) and the selectors need a real DOM to harden against. Verify manually by
+  opening an estimator-built change order and confirming the buttons appear and gate by
+  status; then this becomes a spec.
