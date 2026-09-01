@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { supabase } from '../lib/supabase'
 import StatMiniGraphShared from '../components/StatMiniGraph'
 import {
@@ -2063,20 +2063,20 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
           </tr>
           <tr className="bg-gray-100 border-b border-gray-300">
             {DAYS.map(d => (
-              <>
+              <Fragment key={d}>
                 <th
-                  key={d + 'i'}
+
                   className="px-2 py-1 text-center text-red-500 font-semibold text-[10px] border-l border-gray-400"
                 >
                   Invoice
                 </th>
                 <th
-                  key={d + 'd'}
+
                   className="px-2 py-1 text-center text-gray-600 font-semibold text-[10px] border-l border-r border-gray-400"
                 >
                   Deposit
                 </th>
-              </>
+              </Fragment>
             ))}
           </tr>
         </thead>
@@ -2089,7 +2089,7 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
             </tr>
           )}
           {allGroups.map(([manager, mRows]) => (
-            <>
+            <Fragment key={'mgr-' + (manager || 'unassigned')}>
               {manager && (
                 <tr key={'mgr-' + manager} className="bg-green-50">
                   <td colSpan={15} className="px-3 py-2">
@@ -2185,21 +2185,21 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
                       />
                     </td>
                     {DAYS.map(d => (
-                      <>
-                        <td key={d + 'i'} className="px-1 py-1 border-l border-gray-400">
+                      <Fragment key={d}>
+                        <td className="px-1 py-1 border-l border-gray-400">
                           <CellInput
                             value={row[`${d}_inv`] || ''}
                             onSave={v => onUpdate(row.id, `${d}_inv`, v)}
                             className="text-red-600"
                           />
                         </td>
-                        <td key={d + 'd'} className="px-1 py-1 border-l border-r border-gray-400">
+                        <td className="px-1 py-1 border-l border-r border-gray-400">
                           <CellInput
                             value={row[`${d}_dep`] || ''}
                             onSave={v => onUpdate(row.id, `${d}_dep`, v)}
                           />
                         </td>
-                      </>
+                      </Fragment>
                     ))}
                     <td
                       className={`px-2 py-1 text-right font-bold border-l border-gray-100 ${end < 0 ? 'text-red-600' : end > 0 ? 'text-gray-800' : 'text-gray-400'}`}
@@ -2224,7 +2224,7 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
                   </tr>
                 )
               })}
-            </>
+            </Fragment>
           ))}
 
           {/* Subtotals */}
@@ -2237,20 +2237,20 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
               const invS = rows.reduce((s, r) => s + (parseFloat(r[`${d}_inv`]) || 0), 0)
               const depS = rows.reduce((s, r) => s + (parseFloat(r[`${d}_dep`]) || 0), 0)
               return (
-                <>
+                <Fragment key={d}>
                   <td
-                    key={d + 'i'}
+
                     className="px-2 py-2 text-right font-bold text-red-600 border-l border-amber-200 text-[11px]"
                   >
                     {fmtC(invS)}
                   </td>
                   <td
-                    key={d + 'd'}
+
                     className="px-2 py-2 text-right font-bold text-gray-700 text-[11px]"
                   >
                     {fmtC(depS)}
                   </td>
-                </>
+                </Fragment>
               )
             })}
             <td className="px-2 py-2 text-right font-bold text-gray-900 border-l border-amber-200">

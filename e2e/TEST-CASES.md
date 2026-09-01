@@ -308,3 +308,22 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   variable named `body` and passed it with shorthand, which a pattern-based fix missed.
 - Verified on staging: `my_tenant_id()` returns the DemoScape tenant, that tenant has
   sms_config, and a real message was delivered to the allowlisted number.
+
+## Collections — keyed fragments in CollectionTable
+
+- `/collections` logged React's "Each child in a list should have a unique key" warning on
+  every render, which failed `navigation.spec.js` (it asserts a clean console).
+- Cause: FOUR `.map()` calls in `CollectionTable` returned a SHORTHAND fragment `<>…</>`
+  with `key` props on the fragment's CHILDREN. React keys the mapped element — the
+  fragment — so those keys did nothing and the fragment itself was keyless. A grep for
+  "map without a nearby key=" finds nothing here, which is why it hid for so long: the
+  keys are present, just on the wrong element.
+- `<>` cannot take a key; `<Fragment>` can. All four now return
+  `<Fragment key={…}>`, and the meaningless child keys were removed. The manager grouping
+  keys on `'mgr-' + (manager || 'unassigned')` so an empty manager name cannot collide.
+- Two other fragments in the same component (lines ~2099, ~2133) are conditional branches,
+  not list items, and correctly need no key.
+- Impact was cosmetic — DAYS is fixed-length and fixed-order, so React's index fallback
+  reconciled correctly and no user ever saw a defect. The real cost was the console noise
+  masking genuine errors on that page.
+- Verified: navigation.spec.js Collections case passes; full navigation suite 9/9 green.
