@@ -1,5 +1,46 @@
 # Test results log
 
+## 2026-09-01 — First run against pbs-staging — 149 passed / 3 failed / 6 skipped (21.5m)
+
+Full suite, first run ever against **staging** rather than prod (`BASE_URL=http://127.0.0.1:5173`,
+local Vite dev server → pbs-staging, which now carries a copy of production's data).
+
+**Before / after within the same session:** 45 passed / 12 failed / 101 skipped → 149 / 3 / 6.
+Nine of the twelve original failures were harness problems, not application problems:
+
+- **6 × "Could not open the <module> editor"** — NOT a product bug. The estimator's shape is
+  estimate → **projects** → modules, and the clickable rows are *projects*, carrying the user's
+  area names ("cook center", "Demo/wall", "gfic"). `openModule()` filters those rows by MODULE
+  name, so it only works on an estimate whose PROJECTS are named after their module type.
+  Concrete passed by luck (a project named "concrete"; Playwright `hasText` is case-insensitive).
+  Fixed by pointing `TEST_ESTIMATE_URL` at the estimate with 16 type-named projects.
+  ⚠️ Consequence worth remembering: most REAL estimates will silently skip or fail this suite,
+  because real users name projects after areas. The suite depends on a purpose-built estimate.
+- **3 × open-redirect** — NOT a product bug; the assertion was self-defeating. `safeInternalPath`
+  held the origin every time, but the spec also asserted `.not.toHaveURL(/example\.com/)` and the
+  payload sits in our OWN query string because the test put it there, so it could never pass.
+  Now parses the URL and asserts on `origin` + `host`. All 4 green.
+
+**The 3 remaining failures:**
+1. `navigation.spec.js` — **loads Collections** — REAL BUG. React "unique key" warning from
+   `CollectionTable`. Every `.map()` in Collections.jsx does carry a `key=`, so a key is
+   resolving to `undefined` on some row (a row arriving with no `id`). Surfaced only once
+   staging held production-shaped data; it is happening in production too. UNFIXED.
+2. `outdoor-kitchen.spec.js` — **frozen-priced live edit** — data shape, not a defect. The spec
+   drives a "BBQ Wall Length" field; this estimate's OK module renders no BBQ Structure section.
+   The module opens and its other 5 tests pass.
+3. `security.spec.js` — **e-documents PDF preview** — environment gap, not a defect. Staging has
+   **0 storage buckets / 0 objects** against prod's 18 / 137,273: the refresh copied database
+   rows but not Supabase Storage, so `job_files` has 9,501 rows pointing at nothing.
+
+**Also uncovered, not test failures:** staging has only **8 of 32 edge functions** deployed, so
+send-email/send-sms/qbwc/process-invoice/helcim-* and 19 others are absent there.
+
+**Harness setup this run:** Playwright's chromium had never been installed on this server, and
+`.env` carried no `TEST_USER_EMAIL`/`TEST_USER_PASSWORD`. `BASE_URL` is pinned to `127.0.0.1`
+rather than `localhost` because the dev server binds IPv4 only and `localhost` can resolve to
+`::1` first.
+
 ## 2026-08-22 — Pool run 07:01Z — 5/5 GREEN (false positive fixed) — ALL MODULES DONE
 - Targeted run of `pool.spec.js`: **6 expected / 0 unexpected / 0 flaky / 0 skipped** (43s).
   All 5 Pool tests GREEN once the NaN-scan `Infinity(?!\s+Edge)` fix ignored the "Infinity Edge

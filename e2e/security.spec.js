@@ -27,9 +27,17 @@ test.describe('Security — open redirect', () => {
       await page.goto(target, { waitUntil: 'domcontentloaded' })
       await settle(page)
 
-      const origin = new URL(page.url()).origin
-      expect(origin, `navigated off-origin via return_to=${payload}`).toBe(new URL(baseURL).origin)
-      await expect(page).not.toHaveURL(/example\.com/)
+      // Only the HOST tells us whether the redirect was followed. The payload is
+      // still sitting in our own query string — we put it there — so matching the
+      // whole URL against /example\.com/ can never pass, no matter how well the
+      // guard works. Assert on the parsed origin and host instead.
+      const url = new URL(page.url())
+      expect(url.origin, `navigated off-origin via return_to=${payload}`).toBe(
+        new URL(baseURL).origin
+      )
+      expect(url.host, `landed on a foreign host via return_to=${payload}`).not.toMatch(
+        /example\.com/
+      )
     })
   }
 })
