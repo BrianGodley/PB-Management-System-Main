@@ -50,7 +50,11 @@ echo "[4/5] Restoring your 8 demo tenants..."
 $PSQL -f "$D/restore-tenancy.sql" >/dev/null
 echo "      done"
 
-echo "[5/5] Row counts:"
+echo "[5/6] Scrubbing live provider credentials copied from production..."
+$PSQL -f "$(dirname "$0")/scrub-staging-credentials.sql" >/dev/null
+echo "      done — staging cannot email, text, charge, or reach the live CRM"
+
+echo "[6/6] Row counts:"
 $PSQL -c "select 'clients' t, count(*) n from public.clients
           union all select 'jobs', count(*) from public.jobs
           union all select 'estimates', count(*) from public.estimates
