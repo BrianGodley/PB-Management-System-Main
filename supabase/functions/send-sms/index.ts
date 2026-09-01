@@ -28,15 +28,24 @@ async function loadSmsConfig(tenantId?: string | null) {
     return data?.sms_config || null
   }
 
-  // No tenant supplied: only safe if exactly one row exists. Anything else is
-  // ambiguous, and guessing which tenant's provider to bill is worse than failing.
-  const { data, error } = await supabase.from('company_settings').select('sms_config, tenant_id')
+  // No tenant supplied. Ambiguity only matters among tenants that actually HAVE
+  // an SMS provider configured — a tenant with no sms_config could never have
+  // been the intended sender. So narrow to configured tenants first: if exactly
+  // one is set up, it is the only possible answer and we use it. Only genuinely
+  // ambiguous cases fail, and then with a message naming the fix.
+  //
+  // This keeps SMS working for older callers that predate tenant_id, instead of
+  // making delivery depend on every caller being updated first.
+  const { data, error } = await supabase
+    .from('company_settings')
+    .select('sms_config, tenant_id')
+    .not('sms_config', 'is', null)
   if (error) throw new Error('Failed to load sms_config: ' + error.message)
   if (!data || data.length === 0) return null
   if (data.length > 1) {
     throw new Error(
-      `sms_config is ambiguous: ${data.length} tenants configured but no tenant_id was supplied. ` +
-      `Pass tenant_id in the request body.`
+      `sms_config is ambiguous: ${data.length} tenants have an SMS provider configured ` +
+      `but no tenant_id was supplied. Pass tenant_id in the request body.`
     )
   }
   return data[0]?.sms_config || null
