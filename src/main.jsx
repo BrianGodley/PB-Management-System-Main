@@ -3,9 +3,25 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 import { migrateLegacyStorage } from './lib/storageMigration'
+import { envLabel, isProduction } from './lib/envLabel'
 
 // Rebrand: migrate any legacy pbs:/pb: localStorage keys to softcake: (once).
 migrateLegacyStorage()
+
+// ── Environment marker ───────────────────────────────────────────────────────
+// Staging and production get run side by side, and the two windows are
+// otherwise identical. Prefixing the tab title makes the staging one obvious
+// even when the window is behind another — the tab strip is what you actually
+// read when they overlap. Production is left alone.
+//
+// `data-env` on <html> is the same fact in a form tests and CSS can see.
+document.documentElement.dataset.env = isProduction() ? 'production' : 'staging'
+const ENV_LABEL = envLabel()
+// Guard the prefix: HMR can re-run this module, and we don't want
+// "STAGING — STAGING — SoftCake".
+if (ENV_LABEL && !document.title.startsWith(`${ENV_LABEL} — `)) {
+  document.title = `${ENV_LABEL} — ${document.title}`
+}
 
 // ── Stale-chunk auto-recovery ────────────────────────────────────────────────
 // After a new deploy, the build's JS chunks get fresh content-hashed names. A

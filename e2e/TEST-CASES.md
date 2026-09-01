@@ -248,3 +248,22 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - Fix: PaverModule → PAVER_RATE_SCOPE, ConcreteModule → CONCRETE_RATE_SCOPE (full own
   category + borrowed shared subs + Base Prep), mirroring WALLS_RATE_SCOPE. FirePit + the
   3 demos were audited and already carry complete own-category scopes.
+
+## env-label.spec.js — staging vs production tab title
+
+- Goal: staging and production get run side by side in separate browser windows, and the
+  two are otherwise pixel-identical. The tab title is what actually distinguishes them
+  when the windows overlap, so it carries the environment.
+- `src/lib/envLabel.js` resolves the Supabase project ref out of `VITE_SUPABASE_URL` and
+  compares it to the pinned production ref. Production is identified positively; anything
+  else — including an unset or malformed URL — resolves to "staging". A forgotten env flag
+  therefore makes a build shout, never makes it impersonate production.
+- `main.jsx` stamps `data-env="production" | "staging"` on `<html>` and, when not
+  production, prefixes `document.title` with `STAGING — `. The prefix is guarded so an HMR
+  re-run can't produce "STAGING — STAGING — SoftCake".
+- Test asserts the INVARIANT, not a fixed string, so the one spec is correct in either
+  environment: `data-env=production` ⇒ title contains no "STAGING";
+  `data-env=staging` ⇒ title starts with "STAGING — ".
+- Second case reloads the page and asserts at most one "STAGING" in the title, guarding
+  the double-prefix regression directly.
+- Non-destructive: loads `/` only, reads the title and one attribute, saves nothing.
