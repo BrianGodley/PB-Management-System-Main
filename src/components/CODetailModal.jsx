@@ -346,7 +346,7 @@ export default function CODetailModal({
         headers: auth,
         body: JSON.stringify({
           to: cell,
-          body: `${job.client_name || job.name}: Change Order #${coState.custom_co_id || ''} (${amount}) is awaiting your approval. Review it in your client portal: ${portalUrl}`,
+          message: `${job.client_name || job.name}: Change Order #${coState.custom_co_id || ''} (${amount}) is awaiting your approval. Review it in your client portal: ${portalUrl}`,
         }),
       })
       results.push(res.ok)

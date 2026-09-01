@@ -627,7 +627,7 @@ export default function COEstimatePanel({
         headers,
         body: JSON.stringify({
           to: cell,
-          body: `${clientName || ''}: Change Order ${amount} is awaiting your approval. Review it in your client portal: ${portalUrl}`,
+          message: `${clientName || ''}: Change Order ${amount} is awaiting your approval. Review it in your client portal: ${portalUrl}`,
         }),
       })
       sent++

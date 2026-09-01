@@ -276,3 +276,20 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   is not a locatable DOM node: production asserts `content: none`; staging asserts the bar
   exists, is 4px, fixed, and non-interactive.
 - Non-destructive: loads `/` only, reads the title and computed styles, saves nothing.
+
+## send-sms — multi-tenant config + payload alias (production bugs)
+
+- `loadSmsConfig` called `.maybeSingle()` on `company_settings` with NO tenant filter.
+  That table holds one row per tenant, so from the moment a second tenant existed the
+  query errored with "multiple rows returned" and EVERY SMS failed before a provider was
+  chosen. Production has 3 tenants — SMS had been broken there, silently.
+- Fix: accept optional `tenant_id`, filter on it, and fall back to the sole row only when
+  the table genuinely holds one. With several tenants and no `tenant_id`, fail with a
+  message naming the fix rather than guessing whose provider to bill.
+- Second bug: `CODetailModal.jsx` and `COEstimatePanel.jsx` posted `{to, body}` while the
+  function read `{to, message}` — so even past bug 1 those two sent an undefined message.
+  Callers now send `message`; the function also accepts `body` as an alias so older
+  callers keep working.
+- Verified on staging against the live SimpleTexting account: ambiguous-tenant call errors
+  clearly, `body`-key call with `tenant_id` delivered (id 6a973ed1…), non-allowlisted
+  number still blocked by the delivery guard.

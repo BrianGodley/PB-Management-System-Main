@@ -8,17 +8,38 @@ const corsHeaders = {
 }
 
 // ── Load provider credentials from company_settings ───────────────────────────
-async function loadSmsConfig() {
+// company_settings holds ONE ROW PER TENANT, so an unfiltered .maybeSingle()
+// errors with "multiple rows returned" the moment a second tenant exists — which
+// is why SMS silently stopped working. Filter by the caller's tenant when one is
+// given, and fall back to the sole row only when the table really does hold one.
+async function loadSmsConfig(tenantId?: string | null) {
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   )
-  const { data, error } = await supabase
-    .from('company_settings')
-    .select('sms_config')
-    .maybeSingle()
+
+  if (tenantId) {
+    const { data, error } = await supabase
+      .from('company_settings')
+      .select('sms_config')
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
+    if (error) throw new Error('Failed to load sms_config: ' + error.message)
+    return data?.sms_config || null
+  }
+
+  // No tenant supplied: only safe if exactly one row exists. Anything else is
+  // ambiguous, and guessing which tenant's provider to bill is worse than failing.
+  const { data, error } = await supabase.from('company_settings').select('sms_config, tenant_id')
   if (error) throw new Error('Failed to load sms_config: ' + error.message)
-  return data?.sms_config || null
+  if (!data || data.length === 0) return null
+  if (data.length > 1) {
+    throw new Error(
+      `sms_config is ambiguous: ${data.length} tenants configured but no tenant_id was supplied. ` +
+      `Pass tenant_id in the request body.`
+    )
+  }
+  return data[0]?.sms_config || null
 }
 
 // ── SimpleTexting ─────────────────────────────────────────────────────────────
@@ -176,8 +197,17 @@ serve(async (req) => {
   }
 
   try {
-    const { to, message } = await req.json()
+    const payload = await req.json()
+    // `body` is accepted as an alias: two change-order components send that key
+    // instead of `message`, which silently produced empty texts.
+    const { to, tenant_id } = payload
+    const message = payload.message ?? payload.body
     const toNumber = toE164(to)
+    if (!message) {
+      return new Response(JSON.stringify({ success: false, error: 'Missing message (or body)' }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
 
     // Outside production, deliver only to explicitly allowlisted numbers.
     // Staging holds real client phone numbers; this is what stops a test from
@@ -191,7 +221,7 @@ serve(async (req) => {
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const smsConfig = await loadSmsConfig()
+    const smsConfig = await loadSmsConfig(tenant_id)
     const activeProvider = smsConfig?.active_provider || 'twilio'
     const creds: Record<string, string> = smsConfig?.providers?.[activeProvider] || {}
 
