@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { guardRecipients } from '../_shared/deliveryGuard.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -173,6 +174,20 @@ serve(async (req) => {
     const { to, subject, html, text } = await req.json()
     if (!to || !subject) return respond({ success: false, error: 'Missing required fields: to, subject' })
 
+    // Outside production, deliver only to explicitly allowlisted addresses.
+    // Staging holds real client email addresses; this is what stops a test from
+    // emailing them. No effect in production.
+    const guard = guardRecipients(to)
+    if (guard.gated && guard.allowed.length === 0) {
+      console.log(`EMAIL BLOCKED (non-production): ${JSON.stringify(to)}`)
+      return respond({
+        success: false, blocked: true, environment: 'non-production',
+        wouldHaveSentTo: to, error: guard.reason,
+      })
+    }
+    // Some recipients allowed, others not — send only to the allowed subset.
+    const safeTo = guard.gated ? guard.allowed : to
+
     // Load provider config from DB; fall back to env var for zero-config Resend
     const emailConfig = await loadEmailConfig().catch(() => null)
     const activeProvider = emailConfig?.active_provider || 'resend'
@@ -191,8 +206,8 @@ serve(async (req) => {
     const sender = PROVIDERS[activeProvider]
     if (!sender) return respond({ success: false, error: `Unknown provider: ${activeProvider}` })
 
-    const result = await sender(creds, to, subject, html ?? '', text ?? '')
-    return respond({ provider: activeProvider, ...result })
+    const result = await sender(creds, safeTo, subject, html ?? '', text ?? '')
+    return respond({ provider: activeProvider, ...result, ...(guard.reason ? { warning: guard.reason } : {}) })
 
   } catch (err) {
     console.error('Error:', err.message)

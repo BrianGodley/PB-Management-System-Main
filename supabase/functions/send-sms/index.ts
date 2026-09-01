@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts"
 import { createClient } from "npm:@supabase/supabase-js@2"
+import { guardRecipients } from '../_shared/deliveryGuard.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -177,6 +178,18 @@ serve(async (req) => {
   try {
     const { to, message } = await req.json()
     const toNumber = toE164(to)
+
+    // Outside production, deliver only to explicitly allowlisted numbers.
+    // Staging holds real client phone numbers; this is what stops a test from
+    // texting them. No effect in production.
+    const guard = guardRecipients(toNumber)
+    if (guard.gated && guard.allowed.length === 0) {
+      console.log(`SMS BLOCKED (non-production): ${toNumber}`)
+      return new Response(JSON.stringify({
+        success: false, blocked: true, environment: 'non-production',
+        wouldHaveSentTo: toNumber, error: guard.reason,
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
 
     const smsConfig = await loadSmsConfig()
     const activeProvider = smsConfig?.active_provider || 'twilio'
