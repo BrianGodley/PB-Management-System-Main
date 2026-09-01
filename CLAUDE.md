@@ -57,11 +57,19 @@ coding from momentum, not policy — stop and re-check.
 - **Running git from the sandbox is allowed** (rule relaxed 2026-08-19). Read
   freely (`git log`, `git diff`, `git status`). Watch for Windows-mount lock
   errors; if a git write fails with a lock, back off and print the command instead.
-- **Default is still: do NOT auto-commit.** After code edits, print the commit
-  command for Brian to run — a plain fenced block (NOT ```powershell; Brian runs
-  Command Prompt / cmd.exe), one command per block, NO `cd` line, NO `+` prefix,
-  NO leading `#` comment — UNLESS Brian explicitly asks you to commit, in which
-  case you may run it from the sandbox.
+- **Two branches, two rules (set 2026-09-01).** `dev` is the working branch on the
+  dev server; `master` is production and deploys to Vercel on push.
+  - **`dev` — commit and push AUTOMATICALLY.** After a set of code edits, commit to
+    `dev` and push it without asking. No Vercel deploy happens (`vercel.json` sets
+    `deploymentEnabled.dev = false`), so this is backup and history only, never a
+    release. Scope every commit with `git commit -m "..." -- <paths>` so a
+    pre-staged index cannot be swept in.
+  - **`master` — NEVER push automatically.** Merging `dev` into `master` and pushing
+    IS the production deploy. Print the command for Brian to run — a plain fenced
+    block (NOT ```powershell; Brian runs Command Prompt / cmd.exe), one command per
+    block, NO `cd` line, NO `+` prefix, NO leading `#` comment — UNLESS Brian
+    explicitly asks you to push, in which case you may run it.
+  - Brian's pre-push review applies to production pushes only, not `dev` pushes.
 - **ALWAYS show SQL inline. Every time you create OR modify a `.sql` file, paste
   its FULL contents in the same chat message as a plain ` ```sql ` block** (file
   name bolded above it) — never just reference the filename and say "run it".
