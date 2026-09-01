@@ -266,4 +266,13 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   `data-env=staging` ⇒ title starts with "STAGING — ".
 - Second case reloads the page and asserts at most one "STAGING" in the title, guarding
   the double-prefix regression directly.
-- Non-destructive: loads `/` only, reads the title and one attribute, saves nothing.
+- Staging also gets a 4px hazard-striped bar fixed across the top of the viewport
+  (`html[data-env='staging']::before` in `index.css`) — pure CSS, no component to mount.
+  It is `position: fixed` so it never shifts layout (staging renders identically to
+  production underneath it), `pointer-events: none` so it can never swallow a click,
+  z-index 2147483647 because the app already uses 10000 and a warning a modal can cover
+  is not a warning, and hidden in `@media print` so a printed bid never carries it.
+- Test reads the pseudo-element via `getComputedStyle(el, '::before')`, since a ::before
+  is not a locatable DOM node: production asserts `content: none`; staging asserts the bar
+  exists, is 4px, fixed, and non-interactive.
+- Non-destructive: loads `/` only, reads the title and computed styles, saves nothing.

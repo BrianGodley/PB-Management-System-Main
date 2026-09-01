@@ -28,6 +28,28 @@ test.describe('Environment label', () => {
     }
   })
 
+  test('staging shows the hazard bar; production shows none', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+
+    const env = await page.locator('html').getAttribute('data-env')
+    // The marker is a ::before pseudo-element on <html>, so it has to be read
+    // through getComputedStyle rather than located as a DOM node.
+    const bar = await page.evaluate(() => {
+      const s = getComputedStyle(document.documentElement, '::before')
+      return { content: s.content, height: s.height, position: s.position, pointerEvents: s.pointerEvents }
+    })
+
+    if (env === 'production') {
+      expect(bar.content, 'production must not render the staging bar').toBe('none')
+    } else {
+      expect(bar.content, 'staging must render the bar').not.toBe('none')
+      expect(bar.height, 'bar should be the 4px marker').toBe('4px')
+      expect(bar.position).toBe('fixed')
+      // Must never intercept a click meant for the app underneath it.
+      expect(bar.pointerEvents, 'bar must not be clickable').toBe('none')
+    }
+  })
+
   test('label is applied once, not repeated on re-render', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' })
     await page.reload({ waitUntil: 'domcontentloaded' })

@@ -42,6 +42,43 @@
   }
 }
 
+/* ── Staging marker ──────────────────────────────────────────────────────────
+   A hazard-striped bar across the very top whenever the app is NOT pointed at
+   the production Supabase project. main.jsx stamps data-env on <html>, so this
+   is pure CSS with no component to mount and nothing to remember to render.
+
+   Deliberately:
+     • fixed + 4px      — never shifts layout, so no page renders differently
+                          in staging than it will in production
+     • pointer-events   — none, so it cannot swallow a click on anything beneath
+     • z-index max      — the app already uses 10000, and a warning that a modal
+                          can cover is not a warning
+     • print: hidden    — a printed bid should never carry it
+   Production sets data-env="production" and matches nothing here. */
+html[data-env='staging']::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  z-index: 2147483647;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    45deg,
+    #b45309 0,
+    #b45309 6px,
+    #f59e0b 6px,
+    #f59e0b 12px
+  );
+}
+
+@media print {
+  html[data-env='staging']::before {
+    display: none;
+  }
+}
+
 /* Job Info read-only fields: a filled value shows dark + bold (overriding the
    washed-out grey iOS gives disabled inputs), while an empty field keeps its
    light-grey placeholder. Only applies to disabled (read-mode) fields. */
