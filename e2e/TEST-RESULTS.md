@@ -1,5 +1,41 @@
 # Test results log
 
+## 2026-09-01 — SMS restored in production (4 bugs, found via staging)
+
+Change-order SMS had been failing silently in PRODUCTION since the second tenant was
+created. Confirmed fixed end to end: a change-order Release → 📱 Text delivered a real
+message to the test client's mobile.
+
+Four separate defects, each of which alone kept SMS broken:
+
+1. `loadSmsConfig` called `.maybeSingle()` on `company_settings` with NO tenant filter.
+   That table holds one row per tenant, so from the second tenant onward the query errored
+   "multiple rows returned" and every SMS failed before a provider was chosen.
+2. `CODetailModal.jsx` and `COEstimatePanel.jsx` posted `{to, body}` while the function
+   read `{to, message}` — an undefined message body even past bug 1.
+3. A THIRD call site in `CODetailModal` (`handleText`) had the same `{to, body}` shape but
+   built the text into a variable named `body` and passed it by shorthand, so a
+   pattern-based fix missed it. It is also DEAD CODE — defined, never referenced — which
+   is why the bug survived: the path could not be reached.
+4. After fixing 1, no caller passed `tenant_id`, so every call hit the new "ambiguous
+   tenant" branch. A clear error instead of a crash, but still no delivery.
+
+Fixes: tenant-scoped lookup with a fallback to the single tenant that actually HAS
+sms_config (ambiguity only matters among tenants that could plausibly send — production
+has 3 tenants but only 1 configured); `body` accepted as an alias for `message`; all three
+call sites routed through `notify.js`, which now resolves and attaches `tenant_id` via
+`my_tenant_id()`. `notify.js` is the single SMS path, so callers cannot drift on payload
+shape again.
+
+An over-strict first attempt (refusing whenever >1 tenant existed) was caught by Brian
+testing in production and corrected — narrowing to configured tenants is what made it work
+without every caller having to be updated first.
+
+Also added: `_shared/deliveryGuard.ts` blocks outbound email/SMS to any recipient not in
+TEST_RECIPIENT_ALLOWLIST outside production. Production is identified positively by project
+ref, so the guard is inert there and a missing env var makes the system MORE cautious.
+Verified on staging: allowlisted number delivered, client number blocked.
+
 ## 2026-09-01 — First run against pbs-staging — 149 passed / 3 failed / 6 skipped (21.5m)
 
 Full suite, first run ever against **staging** rather than prod (`BASE_URL=http://127.0.0.1:5173`,
