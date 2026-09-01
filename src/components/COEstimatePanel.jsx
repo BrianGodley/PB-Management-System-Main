@@ -66,6 +66,7 @@ import FinishesSummary from './modules/FinishesSummary'
 import StepsModule from './modules/StepsModule'
 import StepsSummary from './modules/StepsSummary'
 import GpmdBar from './modules/GpmdBar'
+import { sendSMS } from '../lib/notify'
 
 const MODULE_GROUPS = [
   { label: 'Demo', items: ['Hand Demo', 'Mini Skid Steer Demo', 'Skid Steer Demo'] },
@@ -622,13 +623,11 @@ export default function COEstimatePanel({
       sent++
     }
     if ((method === 'text' || method === 'both') && cell) {
-      await fetch(`${base}/functions/v1/send-sms`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          to: cell,
-          message: `${clientName || ''}: Change Order ${amount} is awaiting your approval. Review it in your client portal: ${portalUrl}`,
-        }),
+      // Shared helper: attaches tenant_id, which send-sms requires to resolve
+      // the right tenant's provider credentials.
+      await sendSMS({
+        to: cell,
+        message: `${clientName || ''}: Change Order ${amount} is awaiting your approval. Review it in your client portal: ${portalUrl}`,
       })
       sent++
     }

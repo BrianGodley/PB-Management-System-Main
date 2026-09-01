@@ -28,6 +28,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import SignatureModal from './SignatureModal'
 import CONotifyDialog from './CONotifyDialog'
+import { sendSMS } from '../lib/notify'
 
 const STORAGE_BUCKET = 'job-files'
 
@@ -341,15 +342,13 @@ export default function CODetailModal({
       results.push(res.ok)
     }
     if ((method === 'text' || method === 'both') && cell) {
-      const res = await fetch(`${base}/functions/v1/send-sms`, {
-        method: 'POST',
-        headers: auth,
-        body: JSON.stringify({
-          to: cell,
-          message: `${job.client_name || job.name}: Change Order #${coState.custom_co_id || ''} (${amount}) is awaiting your approval. Review it in your client portal: ${portalUrl}`,
-        }),
+      // Via the shared helper so tenant_id is always attached — send-sms needs it
+      // to pick the right tenant's provider out of company_settings.
+      const { error: smsErr } = await sendSMS({
+        to: cell,
+        message: `${job.client_name || job.name}: Change Order #${coState.custom_co_id || ''} (${amount}) is awaiting your approval. Review it in your client portal: ${portalUrl}`,
       })
-      results.push(res.ok)
+      results.push(!smsErr)
     }
     if (results.length === 0) {
       throw new Error('No client contact on file for the selected method.')
@@ -558,18 +557,9 @@ export default function CODetailModal({
       const {
         data: { session },
       } = await supabase.auth.getSession()
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-sms`
-      const body = `${job.client_name || job.name}: Change Order #${coState.custom_co_id || ''} — "${coState.co_name}" — Amount: $${Number(coState.bid_amount || 0).toLocaleString()}.`
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ to, body }),
-      })
-      const data = await res.json()
-      if (!res.ok || data.success === false) throw new Error(data.error || `HTTP ${res.status}`)
+      const message = `${job.client_name || job.name}: Change Order #${coState.custom_co_id || ''} — "${coState.co_name}" — Amount: $${Number(coState.bid_amount || 0).toLocaleString()}.`
+      const { data, error: smsErr } = await sendSMS({ to, message })
+      if (smsErr || data?.success === false) throw new Error(smsErr?.message || data?.error || 'SMS failed')
       alert('Text sent!')
       onSent && onSent()
     } catch (e) {

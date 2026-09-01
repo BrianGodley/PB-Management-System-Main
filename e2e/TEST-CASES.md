@@ -293,3 +293,18 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - Verified on staging against the live SimpleTexting account: ambiguous-tenant call errors
   clearly, `body`-key call with `tenant_id` delivered (id 6a973ed1…), non-allowlisted
   number still blocked by the delivery guard.
+
+## SMS callers must pass tenant_id (completes the send-sms fix)
+
+- Fixing `loadSmsConfig` turned a cryptic crash into a clear error, but SMS still could not
+  send: NO caller passed `tenant_id`, so every call hit the "ambiguous tenant" branch.
+- `notify.js` now resolves the tenant once via `supabase.rpc('my_tenant_id')`, caches it
+  (it cannot change without a re-login), and attaches it to every send-sms payload.
+  `sendSMS({ to, message, tenantId })` also accepts an explicit override.
+- All three inline `fetch('/functions/v1/send-sms')` call sites — two in CODetailModal,
+  one in COEstimatePanel — now go through `sendSMS()`. `notify.js` is the single SMS path,
+  so no caller can drift on payload shape again. That drift is exactly what produced the
+  `{to, body}` vs `{to, message}` bug: one of the three sites built the text into a
+  variable named `body` and passed it with shorthand, which a pattern-based fix missed.
+- Verified on staging: `my_tenant_id()` returns the DemoScape tenant, that tenant has
+  sms_config, and a real message was delivered to the allowlisted number.

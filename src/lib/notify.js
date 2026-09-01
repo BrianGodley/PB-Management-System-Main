@@ -10,6 +10,26 @@
  *   await sendSMS({ to: '+15551234567', message: 'Your job is ready.' })
  */
 
+import { supabase } from './supabase'
+
+// ── Current tenant ────────────────────────────────────────────────────────────
+// send-sms reads per-tenant provider credentials out of company_settings, which
+// holds ONE ROW PER TENANT. Without a tenant_id the function cannot tell whose
+// SMS provider to bill, so it refuses. Resolve it once and reuse — it cannot
+// change without a re-login.
+let _tenantId = null
+async function currentTenantId() {
+  if (_tenantId) return _tenantId
+  try {
+    const { data } = await supabase.rpc('my_tenant_id')
+    _tenantId = data || null
+  } catch (e) {
+    console.error('[notify] could not resolve tenant_id:', e)
+    _tenantId = null
+  }
+  return _tenantId
+}
+
 // ── Low-level senders ─────────────────────────────────────────────────────────
 
 export async function sendEmail({ to, subject, html, text }) {
@@ -56,7 +76,7 @@ export async function sendEmail({ to, subject, html, text }) {
   return { data, error: null }
 }
 
-export async function sendSMS({ to, message }) {
+export async function sendSMS({ to, message, tenantId = null }) {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
   const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY
   // Use the anon key as Bearer token — newer Supabase projects issue ES256
@@ -71,7 +91,7 @@ export async function sendSMS({ to, message }) {
         Authorization: `Bearer ${supabaseAnon}`,
         apikey: supabaseAnon,
       },
-      body: JSON.stringify({ to, message }),
+      body: JSON.stringify({ to, message, tenant_id: tenantId || (await currentTenantId()) }),
     })
   } catch (networkErr) {
     console.error('[notify] sendSMS network error:', networkErr)
