@@ -56,7 +56,14 @@ export type LLMResponse = {
   model: string
   stop_reason: string
   content: Array<unknown>      // mix of text + tool_use blocks
-  usage: { input_tokens: number; output_tokens: number }
+  usage: {
+    input_tokens: number
+    output_tokens: number
+    // Present when prompt caching is active. cache_read_input_tokens is the
+    // number billed at ~10% — if it is 0 on repeat calls the prefix is varying.
+    cache_creation_input_tokens?: number
+    cache_read_input_tokens?: number
+  }
 }
 
 // ── callLLM ────────────────────────────────────────────────────────────────
@@ -73,10 +80,26 @@ export async function callLLM(args: {
   const model = MODEL_BY_TASK[args.task]
   const max_tokens = MAX_TOKENS_BY_TASK[args.task]
 
+  // ── Prompt caching ──────────────────────────────────────────────────────
+  // Sam's persona is ~30KB and the tool schemas ride in front of it on every
+  // call. Uncached, that static prefix is re-billed at the full input rate each
+  // time; a cache read costs roughly a tenth of that.
+  //
+  // Caching is a PREFIX match in render order tools → system → messages, so a
+  // breakpoint on the system block covers the tool schemas too. Everything
+  // volatile (the conversation) sits after it and is billed normally.
+  //
+  // The prefix must be byte-identical between calls or the cache silently
+  // misses — so nothing per-request (timestamps, user ids, tenant names) may be
+  // interpolated into `system` upstream of here. Verify with
+  // usage.cache_read_input_tokens: if it stays 0 across repeated calls,
+  // something in the prefix is varying.
   const body: Record<string, unknown> = {
     model,
     max_tokens,
-    system: args.system,
+    system: [
+      { type: 'text', text: args.system, cache_control: { type: 'ephemeral' } },
+    ],
     messages: args.messages,
   }
   if (args.tools && args.tools.length > 0) {
@@ -104,7 +127,16 @@ export async function callLLM(args: {
     })
 
     if (res.ok) {
-      return await res.json() as LLMResponse
+      const parsed = await res.json() as LLMResponse
+      // One line per call so cache effectiveness is observable in the function
+      // logs without extra tooling. A healthy steady state shows `read` climbing
+      // and `write` only on the first call after a persona or tool change.
+      const u = parsed.usage
+      console.log(
+        `[llm] ${model} in=${u?.input_tokens ?? 0} out=${u?.output_tokens ?? 0} ` +
+        `cache_write=${u?.cache_creation_input_tokens ?? 0} cache_read=${u?.cache_read_input_tokens ?? 0}`
+      )
+      return parsed
     }
 
     const text = await res.text()

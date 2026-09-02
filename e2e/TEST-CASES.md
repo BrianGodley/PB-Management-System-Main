@@ -380,3 +380,21 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - This is the bug that cost real debugging time on 2026-09-01: a change-order release
   reported success while no SMS was sent, and there was no way to tell from the UI whether
   the client had no mobile, the function errored, or the message was simply lost.
+
+## agent-chat — prompt caching on Sam's static prefix
+
+- Sam re-sent its full static prefix — the ~30KB persona plus 17 tool schemas, 11,564 tokens
+  measured — at the full input rate on EVERY call, and a single user question costs three
+  LLM calls (the tool-use loop), so the prefix was billed three times per question.
+- `callLLM` now sends `system` as a content-block array with
+  `cache_control: {type: 'ephemeral'}`. Caching is a prefix match in render order
+  tools → system → messages, so one breakpoint on the system block covers the tool schemas
+  too; the conversation sits after it and is billed normally.
+- Every call now logs `[llm] <model> in= out= cache_write= cache_read=` so cache health is
+  visible in the function logs without extra tooling.
+- Verified on staging by signing in and asking Sam a question twice: first call
+  cache_write=11564 / cache_read=0, all five subsequent calls cache_read=11564.
+- FRAGILE BY DESIGN: the prefix must be byte-identical between calls. Anything per-request
+  interpolated into `system` upstream — a timestamp, a user id, a tenant name — silently
+  drops the hit rate to zero with no error. `cache_read_input_tokens` staying 0 across
+  repeated calls is the signal.
