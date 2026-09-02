@@ -359,3 +359,24 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - Removed 56 lines. Lint on the file is now 0 errors / 0 unused symbols.
 - NOT touched: `WorkOrders.jsx` has its own `handleEmail`/`handleText`, both wired to real
   buttons. Same names, different component, still live.
+
+## Change-order notification — per-channel outcome reporting
+
+- Two silent-failure bugs in `sendClientNotification`, in BOTH CODetailModal and
+  COEstimatePanel:
+  1. **Missing contact was skipped silently.** The send was guarded by
+     `if ((method === 'text' || method === 'both') && cell)`. With method "both" and only
+     an email on file, the email went, `sent` was non-zero, and NOTHING said the text never
+     did. The user reasonably assumed the client was reached both ways.
+  2. **Failures were counted as successes.** CODetailModal pushed `res.ok` into a `results`
+     array it only ever checked the LENGTH of; COEstimatePanel incremented `sent` without
+     looking at the response at all. A 500 from send-email reported success.
+- Both now track each requested channel separately and return `{ sent, problems }`:
+  no contact on file → "no mobile number on file for this client"; a failed send →
+  "text failed (<reason>)". Nothing sent at all still throws, now naming every reason.
+- `handleNotifySend` surfaces partial failures after the release completes — `setError`
+  in CODetailModal, `alert` in COEstimatePanel — so a release still succeeds but the user
+  is told which channel did not go.
+- This is the bug that cost real debugging time on 2026-09-01: a change-order release
+  reported success while no SMS was sent, and there was no way to tell from the UI whether
+  the client had no mobile, the function errored, or the message was simply lost.

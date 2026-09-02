@@ -326,33 +326,53 @@ export default function CODetailModal({
     } = await supabase.auth.getSession()
     const base = import.meta.env.VITE_SUPABASE_URL
     const auth = { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }
-    const results = []
-    if ((method === 'email' || method === 'both') && email) {
-      const res = await fetch(`${base}/functions/v1/send-email`, {
-        method: 'POST',
-        headers: auth,
-        body: JSON.stringify({
-          to: email,
-          subject: `Change Order #${coState.custom_co_id || ''} — approval requested`,
-          html:
-            buildPrintableHtml(coState, job) +
-            `<p style="margin-top:16px">Please review and approve this change order in your client portal: <a href="${portalUrl}">${portalUrl}</a></p>`,
-        }),
-      })
-      results.push(res.ok)
+    // Track every requested channel separately. The old version pushed booleans
+    // into an array it never inspected, so a FAILED send and a missing contact both
+    // looked like success — and "both" with only an email on file sent the email
+    // and said nothing about the text that never went.
+    const problems = []
+    let sent = 0
+
+    if (method === 'email' || method === 'both') {
+      if (!email) {
+        problems.push('no email address on file for this client')
+      } else {
+        const res = await fetch(`${base}/functions/v1/send-email`, {
+          method: 'POST',
+          headers: auth,
+          body: JSON.stringify({
+            to: email,
+            subject: `Change Order #${coState.custom_co_id || ''} — approval requested`,
+            html:
+              buildPrintableHtml(coState, job) +
+              `<p style="margin-top:16px">Please review and approve this change order in your client portal: <a href="${portalUrl}">${portalUrl}</a></p>`,
+          }),
+        })
+        const body = await res.json().catch(() => null)
+        if (!res.ok || body?.success === false) {
+          problems.push(`email failed (${body?.error || `HTTP ${res.status}`})`)
+        } else sent++
+      }
     }
-    if ((method === 'text' || method === 'both') && cell) {
-      // Via the shared helper so tenant_id is always attached — send-sms needs it
-      // to pick the right tenant's provider out of company_settings.
-      const { error: smsErr } = await sendSMS({
-        to: cell,
-        message: `${job.client_name || job.name}: Change Order #${coState.custom_co_id || ''} (${amount}) is awaiting your approval. Review it in your client portal: ${portalUrl}`,
-      })
-      results.push(!smsErr)
+
+    if (method === 'text' || method === 'both') {
+      if (!cell) {
+        problems.push('no mobile number on file for this client')
+      } else {
+        // Shared helper so tenant_id is always attached — send-sms needs it to
+        // pick the right tenant's provider out of company_settings.
+        const { data, error: smsErr } = await sendSMS({
+          to: cell,
+          message: `${job.client_name || job.name}: Change Order #${coState.custom_co_id || ''} (${amount}) is awaiting your approval. Review it in your client portal: ${portalUrl}`,
+        })
+        if (smsErr || data?.success === false) {
+          problems.push(`text failed (${smsErr?.message || data?.error || 'unknown error'})`)
+        } else sent++
+      }
     }
-    if (results.length === 0) {
-      throw new Error('No client contact on file for the selected method.')
-    }
+
+    if (sent === 0) throw new Error(`Nothing was sent — ${problems.join('; ')}.`)
+    return { sent, problems }
   }
 
   // Release: notify the client + flip to pending (visible in portal). Resend:
@@ -361,11 +381,14 @@ export default function CODetailModal({
     setSaving(true)
     setError('')
     try {
-      await sendClientNotification(method)
+      const { problems } = await sendClientNotification(method)
       if (notifyMode === 'release') {
         await setStatus('pending')
       }
       setNotifyMode(null)
+      // Something went out, but not everything asked for. Say so rather than
+      // letting the user assume the client was reached on every channel.
+      if (problems?.length) setError(`Sent, but: ${problems.join('; ')}.`)
       onSent && onSent()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))

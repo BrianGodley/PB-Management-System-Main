@@ -609,37 +609,61 @@ export default function COEstimatePanel({
       Authorization: `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
     }
+    // Per-channel outcomes. The old version counted a send as successful without
+    // ever looking at the response, and skipped a channel silently when the client
+    // had no contact for it.
+    const problems = []
     let sent = 0
-    if ((method === 'email' || method === 'both') && email) {
-      await fetch(`${base}/functions/v1/send-email`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          to: email,
-          subject: `Change Order #${coRow?.custom_co_id || ''} — approval requested`,
-          html: `<p>${clientName || ''}, a change order (${title || 'Change Order'}, ${amount}) is awaiting your approval.</p><p>Please review and approve it in your client portal: <a href="${portalUrl}">${portalUrl}</a></p>`,
-        }),
-      })
-      sent++
+
+    if (method === 'email' || method === 'both') {
+      if (!email) {
+        problems.push('no email address on file for this client')
+      } else {
+        const res = await fetch(`${base}/functions/v1/send-email`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            to: email,
+            subject: `Change Order #${coRow?.custom_co_id || ''} — approval requested`,
+            html: `<p>${clientName || ''}, a change order (${title || 'Change Order'}, ${amount}) is awaiting your approval.</p><p>Please review and approve it in your client portal: <a href="${portalUrl}">${portalUrl}</a></p>`,
+          }),
+        })
+        const b = await res.json().catch(() => null)
+        if (!res.ok || b?.success === false) {
+          problems.push(`email failed (${b?.error || `HTTP ${res.status}`})`)
+        } else sent++
+      }
     }
-    if ((method === 'text' || method === 'both') && cell) {
-      // Shared helper: attaches tenant_id, which send-sms requires to resolve
-      // the right tenant's provider credentials.
-      await sendSMS({
-        to: cell,
-        message: `${clientName || ''}: Change Order ${amount} is awaiting your approval. Review it in your client portal: ${portalUrl}`,
-      })
-      sent++
+
+    if (method === 'text' || method === 'both') {
+      if (!cell) {
+        problems.push('no mobile number on file for this client')
+      } else {
+        // Shared helper: attaches tenant_id, which send-sms requires to resolve the
+        // right tenant's provider credentials.
+        const { data, error: smsErr } = await sendSMS({
+          to: cell,
+          message: `${clientName || ''}: Change Order ${amount} is awaiting your approval. Review it in your client portal: ${portalUrl}`,
+        })
+        if (smsErr || data?.success === false) {
+          problems.push(`text failed (${smsErr?.message || data?.error || 'unknown error'})`)
+        } else sent++
+      }
     }
-    if (sent === 0) throw new Error('No client contact on file for the selected method.')
+
+    if (sent === 0) throw new Error(`Nothing was sent — ${problems.join('; ')}.`)
+    return { sent, problems }
   }
 
   async function handleNotifySend(method) {
     setLifecycleBusy(true)
     try {
-      await sendClientNotification(method)
+      const { problems } = await sendClientNotification(method)
       if (notifyMode === 'release') await setCoStatus('pending')
       setNotifyMode(null)
+      // Partial success — say which channel did not go, instead of
+      // implying the client was reached on all of them.
+      if (problems?.length) alert(`Sent, but: ${problems.join('; ')}.`)
     } catch (e) {
       alert(e instanceof Error ? e.message : String(e))
     }
