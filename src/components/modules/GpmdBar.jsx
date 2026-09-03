@@ -291,9 +291,9 @@ export default function GpmdBar({
   //    Read-only: the price is the sum of everything left of it, never typed.
   function TotalPriceBox() {
     return (
-      <div className="rounded-lg bg-green-500/20 border border-green-400/30 px-3 py-1 text-center min-w-[76px]">
-        <p className="text-xs mb-0.5 whitespace-nowrap text-green-300">TOTAL PRICE</p>
-        <p className="font-bold tabular-nums text-base text-green-200">{fmt(effectivePrice)}</p>
+      <div className="rounded-lg bg-blue-500/20 border border-blue-400/30 px-3 py-1 text-center min-w-[76px]">
+        <p className="text-xs mb-0.5 whitespace-nowrap text-blue-300">TOTAL PRICE</p>
+        <p className="font-bold tabular-nums text-base text-blue-200">{fmt(effectivePrice)}</p>
       </div>
     )
   }
@@ -366,7 +366,7 @@ export default function GpmdBar({
             </p>
             <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-green-400/70 bg-gray-900 py-1.5 px-1">
               <Cell label="Commission" value={fmt(effectiveComm)} dim="12%" />
-              <Cell label="Total Gross Profit" value={fmt(effectiveGp + subGp)} />
+              <Cell label="Total Gross Profit" value={fmt(effectiveGp + subGp)} color="text-green-400" />
               <div className="flex-1 min-w-0 self-center flex justify-center">
               <TotalPriceBox />
             </div>
