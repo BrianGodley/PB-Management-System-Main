@@ -207,7 +207,7 @@ export default function GpmdBar({
     { label: 'Sub Cost', value: subCost > 0 ? fmt(subCost) : '—', dim: null },
     { label: 'Commission', value: fmt(effectiveComm), dim: '12%' },
     { label: 'Gross Profit', value: fmt(effectiveGp), dim: null, green: true },
-    { label: 'Total Price', value: fmt(effectivePrice), dim: null, blue: true, big: true },
+    { label: 'TOTAL PRICE', value: fmt(effectivePrice), dim: null, blue: true, big: true },
   ]
 
   // ── Sub GP box — styled like the GPMD box (amber), rate inline-editable ────
@@ -414,7 +414,7 @@ export default function GpmdBar({
             <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-green-400/70 bg-gray-900 py-1.5 px-1">
               <Cell label="Commission" value={fmt(effectiveComm)} dim="12%" />
               <Cell label="Total Gross Profit" value={fmt(effectiveGp + subGp)} />
-              <Cell label="Total Price" value={fmt(effectivePrice)} color="text-blue-300" big />
+              <Cell label="TOTAL PRICE" value={fmt(effectivePrice)} color="text-blue-300" big />
             </div>
           </div>
         </div>
@@ -434,7 +434,7 @@ export default function GpmdBar({
           </div>
           <Cell label="Gross Profit" value={subGp > 0 ? fmt(subGp) : '—'} />
           <Cell label="Commission" value={fmt(effectiveComm)} dim="12%" />
-          <Cell label="Total Price" value={fmt(effectivePrice)} color="text-blue-400" big />
+          <Cell label="TOTAL PRICE" value={fmt(effectivePrice)} color="text-blue-400" big />
         </div>
       </div>
     )
@@ -466,7 +466,7 @@ export default function GpmdBar({
           // column, so both sit to the left of Gross Profit.
           const insertBoxes = col.label === 'Commission'
           // Always visible (even collapsed on mobile): Gross Profit + Total Price.
-          const essential = col.label === 'Gross Profit' || col.label === 'Total Price'
+          const essential = col.label === 'Gross Profit' || col.label === 'TOTAL PRICE'
           const hideCls = essential || expanded ? '' : 'hidden lg:block'
           // Use a keyed Fragment so React stops warning about missing keys
           // on this iterator (shorthand <> can't accept a key prop).
