@@ -40,4 +40,50 @@ test.describe('Estimator', () => {
       test.info().annotations.push({ type: 'note', description: 'No Fire Pit module on this estimate.' })
     }
   })
+
+  // ── Summary bar: four groups, materials split out of In-House labour ───────
+  // The estimate bar used to be three groups (In House / Subcontractor /
+  // Totals) with Materials sitting inside In-House. Materials now has its own
+  // group so labour profit and material profit are separate verticals.
+  test('estimate summary bar shows four groups with Materials split out', async ({ page }) => {
+    await page.goto(ESTIMATE, { waitUntil: 'domcontentloaded' })
+    await settle(page)
+
+    // Group headings. "In House Labor Estimate" is the rename — asserting the
+    // exact string catches a revert to the old "In House Estimate".
+    await expect(page.getByText('In House Labor Estimate', { exact: true })).toBeVisible()
+    await expect(page.getByText('Subcontractor Estimate', { exact: true })).toBeVisible()
+    await expect(page.getByText('Materials Estimate', { exact: true })).toBeVisible()
+    await expect(page.getByText('Estimate Totals', { exact: true })).toBeVisible()
+
+    // Materials must appear exactly once and NOT inside the In-House group.
+    // The group is the heading's next sibling, so scope the search to it.
+    const inHouse = page.locator('div.flex.flex-col', {
+      has: page.getByText('In House Labor Estimate', { exact: true }),
+    }).first()
+    await expect(inHouse.getByText('Materials', { exact: true })).toHaveCount(0)
+
+    const materials = page.locator('div.flex.flex-col', {
+      has: page.getByText('Materials Estimate', { exact: true }),
+    }).first()
+    await expect(materials.getByText('Materials', { exact: true })).toBeVisible()
+    // Mirrors the Sub group: cost, an orange Markup box, then Gross Profit.
+    await expect(materials.getByText('Markup', { exact: true })).toBeVisible()
+    await expect(materials.getByText('Gross Profit', { exact: true })).toBeVisible()
+  })
+
+  // No-fallback rule: an unset material markup must read as missing, never 0%.
+  test('unset material markup renders as a dash, not a zero', async ({ page }) => {
+    await page.goto(ESTIMATE, { waitUntil: 'domcontentloaded' })
+    await settle(page)
+    const materials = page.locator('div.flex.flex-col', {
+      has: page.getByText('Materials Estimate', { exact: true }),
+    }).first()
+    const markupValue = materials.locator('p.tabular-nums').first()
+    const text = (await markupValue.textContent())?.trim()
+    // Either a real percentage or an em dash — never "0%", which would mean a
+    // missing rate had silently resolved to a constant.
+    expect(text, `Material markup rendered as "${text}"`).not.toBe('0%')
+    expect(text).toMatch(/^(—|\d+(\.\d+)?%)$/)
+  })
 })

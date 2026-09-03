@@ -1839,8 +1839,9 @@ export default function EstimateDetail() {
             directPrice={et.price}
             price={et.price}
             subMarkupRate={derivedEstSubRate}
-            inHouseLabel="In House Estimate"
+            inHouseLabel="In House Labor Estimate"
             subLabel="Subcontractor Estimate"
+            materialsLabel="Materials Estimate"
             totalsLabel="Estimate Totals"
           />
         )}
@@ -1872,8 +1873,9 @@ export default function EstimateDetail() {
             onGpmdSave={val => saveProjectGpmd(selectedProject.id, val)}
             subMarkupRate={selectedProject.sub_gp_markup_rate ?? 0.2}
             onSubMarkupSave={val => saveProjectSubRate(selectedProject.id, val)}
-            inHouseLabel={`In House ${selectedProject.project_name} Project`}
+            inHouseLabel={`In House Labor ${selectedProject.project_name} Project`}
             subLabel={`Subcontractor ${selectedProject.project_name} Project`}
+            materialsLabel={`Materials ${selectedProject.project_name} Project`}
             totalsLabel={`${selectedProject.project_name} Project Totals`}
           />
         </div>

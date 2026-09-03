@@ -398,3 +398,23 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   interpolated into `system` upstream — a timestamp, a user id, a tenant name — silently
   drops the hit rate to zero with no error. `cache_read_input_tokens` staying 0 across
   repeated calls is the signal.
+
+## Estimator summary bar — four groups, Materials as its own vertical
+
+- The estimate/project summary bar (`GpmdBar`, `variant='full'`) was three groups:
+  In House / Subcontractor / Totals, with Materials sitting inside In-House. Labour
+  profit and material profit were therefore blended into one number.
+- Now four groups: **In House Labor** (labour hours · man days · crew labor · burden ·
+  GPMD · GP), **Subcontractor** (sub cost · markup · GP), **Materials** (material cost ·
+  markup · GP — mirrors Sub), **Totals** (unchanged). In-House flex 7 → 6; cell padding
+  px-2 → px-1 so four groups fit the width three used to have.
+- `e2e/estimator.spec.js` asserts all four headings by exact string, that Materials does
+  NOT appear inside the In-House group, and that the Materials group carries cost, Markup
+  and Gross Profit.
+- NO-FALLBACK: `materialMarkupRate` has no default. Unset renders "—", never "0%" — a
+  second case asserts this, since a constant default here would silently invent profit.
+- OPEN: nothing in the codebase computes a material gross profit today, and only Lighting
+  has a material markup at all (`misc_rates` → 'Lighting - Material Markup'), where it is
+  baked INTO the material figure (`totalMat = markedUpMat + manMat`) rather than tracked
+  separately. Until the rate source is decided the Materials group renders "—" for markup
+  and GP. Totals still read `effectiveGp + subGp` — material GP is deliberately not added.

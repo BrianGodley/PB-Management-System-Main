@@ -40,6 +40,12 @@ export default function GpmdBar({
   onGpmdSave = null, // if provided → PROJECT mode (editable GPMD)
   subMarkupRate = 0.2, // Sub GP = subCost × subMarkupRate
   onSubMarkupSave = null, // if provided → Sub % cell is editable
+  // Materials group (full layout only). No default rate: an unset material
+  // markup shows "—" rather than resolving to a constant, so an unpriced
+  // materials line is visible instead of silently reading as 0%.
+  materialMarkupRate = null, // Material GP = totalMat × materialMarkupRate
+  onMaterialMarkupSave = null, // if provided → Material % cell is editable
+  directMaterialGp = null, // aggregate bars: summed module material GP
   sticky = false, // when true: renders with sticky positioning (handled by parent wrapper)
   // 'full' (default) shows every column — used by the project + estimate
   //   aggregate bars, which combine In-House and Subcontractor totals.
@@ -47,8 +53,9 @@ export default function GpmdBar({
   // 'sub' hides Labor Hours, Man Days, GPMD, Crew Labor, Labor Burden (module Sub tab).
   variant = 'full',
   // Group headings for the full (Project/Estimate) layout.
-  inHouseLabel = 'In House',
+  inHouseLabel = 'In House Labor',
   subLabel = 'Subcontractor',
+  materialsLabel = 'Materials',
   totalsLabel = 'Totals',
 }) {
   const isSubView = variant === 'sub'
@@ -57,6 +64,8 @@ export default function GpmdBar({
   const [draftGpmd, setDraftGpmd] = useState('')
   const [editingSubPct, setEditingSubPct] = useState(false)
   const [draftSubPct, setDraftSubPct] = useState('')
+  const [editingMatPct, setEditingMatPct] = useState(false)
+  const [draftMatPct, setDraftMatPct] = useState('')
   // On phones the bar collapses to just GPMD / Gross Profit / Total Price; the
   // rest reveal via the More toggle (and wrap onto extra rows). Desktop (lg)
   // always shows everything.
@@ -84,6 +93,23 @@ export default function GpmdBar({
     : directSubGp != null && (subCost || 0) > 0
       ? pct1(directSubGp / subCost)
       : pct1(subMarkupRate)
+  // Materials mirror the Sub group, with one difference: there is no default
+  // rate. Both stay null when nothing is set, and the cells render "—".
+  const materialGp =
+    directMaterialGp != null
+      ? directMaterialGp
+      : materialMarkupRate != null
+        ? (totalMat || 0) * materialMarkupRate
+        : null
+  const displayMatPct = onMaterialMarkupSave
+    ? materialMarkupRate != null
+      ? pct1(materialMarkupRate)
+      : null
+    : directMaterialGp != null && (totalMat || 0) > 0
+      ? pct1(directMaterialGp / totalMat)
+      : materialMarkupRate != null
+        ? pct1(materialMarkupRate)
+        : null
   // Commission + Total Price are variant-specific so each module tab shows only
   // ITS side's total: In-House = labour+burden+materials+GP; Sub = subCost+SubGP.
   // 'full' (project/estimate) combines everything.
@@ -121,6 +147,18 @@ export default function GpmdBar({
     const val = parseFloat(draftSubPct)
     if (!isNaN(val) && val >= 0) onSubMarkupSave(val / 100)
     setEditingSubPct(false)
+  }
+
+  // ── Material % edit handlers ──────────────────────────────────────────────
+  function startMatEdit() {
+    if (!onMaterialMarkupSave) return
+    setDraftMatPct(displayMatPct == null ? '' : String(displayMatPct))
+    setEditingMatPct(true)
+  }
+  function commitMatEdit() {
+    const val = parseFloat(draftMatPct)
+    if (!isNaN(val) && val >= 0) onMaterialMarkupSave(val / 100)
+    setEditingMatPct(false)
   }
 
   // ── GPMD cell ──────────────────────────────────────────────────────────────
@@ -223,7 +261,7 @@ export default function GpmdBar({
   // ── Plain value cell used by the grouped (full) layout ─────────────────────
   function Cell({ label, value, dim, color = 'text-white', big = false, cls = 'flex-1 min-w-0' }) {
     return (
-      <div className={`px-2 min-w-0 text-center self-center ${cls}`}>
+      <div className={`px-1 min-w-0 text-center self-center ${cls}`}>
         <p className="text-[10px] text-gray-400 leading-tight mb-0.5">
           {label}
           {dim && <span className="ml-1 text-gray-500">{dim}</span>}
@@ -273,23 +311,67 @@ export default function GpmdBar({
     )
   }
 
+  // ── Material markup box — orange, mirrors MarkupBox. Renders "—" when the
+  //    rate is unset so an unpriced materials line reads as missing, not 0%.
+  function MaterialMarkupBox() {
+    if (onMaterialMarkupSave && editingMatPct) {
+      return (
+        <div className="rounded-lg bg-orange-500/20 border border-orange-400/50 px-2 py-1 text-center min-w-[56px]">
+          <p className="text-xs mb-0.5 whitespace-nowrap text-orange-300">Markup</p>
+          <div className="flex items-center justify-center gap-0.5">
+            <input
+              autoFocus
+              value={draftMatPct}
+              onChange={e => setDraftMatPct(e.target.value)}
+              onBlur={commitMatEdit}
+              onKeyDown={e => {
+                if (e.key === 'Enter') commitMatEdit()
+                if (e.key === 'Escape') setEditingMatPct(false)
+              }}
+              className="w-10 bg-gray-800 border border-orange-400 rounded text-orange-200 text-sm font-bold text-center tabular-nums outline-none px-1"
+            />
+            <span className="text-orange-300 text-sm font-bold">%</span>
+          </div>
+        </div>
+      )
+    }
+    return (
+      <div
+        className={`rounded-lg bg-orange-500/20 border border-orange-400/30 px-2 py-1 text-center min-w-[56px] ${onMaterialMarkupSave ? 'cursor-pointer hover:bg-orange-500/30 transition-colors' : ''}`}
+        onClick={onMaterialMarkupSave ? startMatEdit : undefined}
+        title={onMaterialMarkupSave ? 'Click to edit material markup %' : undefined}
+      >
+        <p className="text-xs mb-0.5 whitespace-nowrap text-orange-300">
+          Markup
+          <span className={`text-orange-500 text-[10px] ml-1 ${onMaterialMarkupSave ? '' : 'invisible'}`}>✎</span>
+        </p>
+        <p className="font-bold tabular-nums text-sm text-orange-200">
+          {displayMatPct == null ? '—' : `${displayMatPct}%`}
+        </p>
+      </div>
+    )
+  }
+
   // ── Grouped layout — Project & Estimate (full) bars ────────────────────────
-  // Left "In House" group (blue) holds labour/materials/in-house GP + GPMD;
-  // right "Subcontractor" group (orange) holds sub cost/GP/markup, then the
-  // combined commission, total GP and total price.
+  // Four groups, left to right:
+  //   In House Labor (blue)   labour hours/man-days/crew cost/burden + GPMD + GP
+  //   Subcontractor (orange)  sub cost · markup · GP
+  //   Materials (orange)      material cost · markup · GP   ← mirrors Sub
+  //   Totals (green)          commission · total GP · total price
+  // Materials moved out of the In-House group so labour profit and material
+  // profit are tracked as separate verticals rather than one blended number.
   if (variant === 'full') {
     return (
       <div className="mt-2 overflow-x-auto">
-        <div className="flex flex-col lg:flex-row gap-3 items-stretch">
-          {/* In House group — 7 columns (grows proportionally) */}
-          <div className="min-w-0 flex flex-col lg:flex-[7_1_0%]">
+        <div className="flex flex-col lg:flex-row gap-2 items-stretch">
+          {/* In House Labor group — 6 columns (grows proportionally) */}
+          <div className="min-w-0 flex flex-col lg:flex-[6_1_0%]">
             <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 mb-1 px-1 text-center truncate">
               {inHouseLabel}
             </p>
             <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-blue-400/70 bg-gray-900 py-1.5 px-1">
               <Cell label="Labor Hours" value={fnum(totalHrs)} />
               <Cell label="Man Days" value={fnum(manDays)} />
-              <Cell label="Materials" value={fmt2(totalMat)} />
               <Cell
                 label="Crew Labor"
                 value={fmt(laborCost)}
@@ -314,6 +396,20 @@ export default function GpmdBar({
                 <MarkupBox />
               </div>
               <Cell label="Gross Profit" value={fmt(subGp)} />
+            </div>
+          </div>
+
+          {/* Materials group — 3 columns, mirrors Subcontractor */}
+          <div className="min-w-0 flex flex-col lg:flex-[3_1_0%]">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-600 mb-1 px-1 text-center truncate">
+              {materialsLabel}
+            </p>
+            <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-orange-400/70 bg-gray-900 py-1.5 px-1">
+              <Cell label="Materials" value={fmt2(totalMat)} />
+              <div className="flex-1 min-w-0 self-center flex justify-center">
+                <MaterialMarkupBox />
+              </div>
+              <Cell label="Gross Profit" value={materialGp == null ? '—' : fmt(materialGp)} />
             </div>
           </div>
 
