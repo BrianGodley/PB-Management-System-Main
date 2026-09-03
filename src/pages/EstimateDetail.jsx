@@ -640,6 +640,7 @@ export default function EstimateDetail() {
       sort_order: projects.length + 1,
       gpmd_override: null,
       sub_gp_markup_rate: 0.2,
+      material_gp_markup_rate: 0,
       estimate_modules: [],
     }
     setProjects(p => [...p, newProj])
@@ -698,7 +699,11 @@ export default function EstimateDetail() {
   // markup, commission = 12% of (In-House GP + Sub GP), total = costs + GP +
   // Sub GP + commission. gross_profit stays In-House-only. Updates the saved
   // snapshot (data.calc) so module detail + list subtext reflect the change.
-  function recalcModuleFinancials(mod, gpmd, subMarkup) {
+  // Material markup mirrors the subcontractor markup exactly: cost × rate is a
+  // profit line that joins the commission base and the total price. It defaults
+  // to 0, so an estimate nobody has set a material markup on prices identically
+  // to before the field existed.
+  function recalcModuleFinancials(mod, gpmd, subMarkup, matMarkup = 0) {
     const manDays = parseFloat(mod.man_days || 0)
     const laborCost = parseFloat(mod.labor_cost || mod.data?.calc?.laborCost || 0)
     const burden = parseFloat(mod.labor_burden || mod.data?.calc?.burden || 0)
@@ -706,13 +711,15 @@ export default function EstimateDetail() {
     const subCost = parseFloat(mod.sub_cost || mod.data?.calc?.subCost || 0)
     const inHouseGp = manDays * gpmd
     const subGp = subCost * subMarkup
-    const commission = (inHouseGp + subGp) * 0.12
-    const price = laborCost + burden + mat + subCost + inHouseGp + subGp + commission
+    const matGp = mat * matMarkup
+    const commission = (inHouseGp + subGp + matGp) * 0.12
+    const price = laborCost + burden + mat + subCost + inHouseGp + subGp + matGp + commission
     const data = {
       ...(mod.data || {}),
       gpmd,
       subGpMarkupRate: subMarkup,
-      calc: { ...(mod.data?.calc || {}), gp: inHouseGp, subGp, commission, price },
+      materialGpMarkupRate: matMarkup,
+      calc: { ...(mod.data?.calc || {}), gp: inHouseGp, subGp, matGp, commission, price },
     }
     return { ...mod, gross_profit: inHouseGp, total_price: price, data }
   }
@@ -736,16 +743,44 @@ export default function EstimateDetail() {
     setProjectGpmds(prev => ({ ...prev, [projectId]: newVal }))
     const proj = projects.find(p => p.id === projectId)
     const projMarkup = proj?.sub_gp_markup_rate ?? 0.2
+    const projMatMarkup = proj?.material_gp_markup_rate ?? 0
     applyProjectModuleRecalc(projectId, { gpmd_override: newVal }, mod =>
-      recalcModuleFinancials(mod, newVal, parseFloat(mod.data?.subGpMarkupRate ?? projMarkup))
+      recalcModuleFinancials(
+        mod,
+        newVal,
+        parseFloat(mod.data?.subGpMarkupRate ?? projMarkup),
+        parseFloat(mod.data?.materialGpMarkupRate ?? projMatMarkup)
+      )
     )
   }
 
   // ── Per-project sub GP markup rate — cascades to every module ──────────
   function saveProjectSubRate(projectId, newVal) {
+    const proj = projects.find(p => p.id === projectId)
+    const projMatMarkup = proj?.material_gp_markup_rate ?? 0
     applyProjectModuleRecalc(projectId, { sub_gp_markup_rate: newVal }, mod => {
       const gpmd = projectGpmds[projectId] ?? parseFloat(mod.data?.gpmd ?? 425)
-      return recalcModuleFinancials(mod, gpmd, newVal)
+      return recalcModuleFinancials(
+        mod,
+        gpmd,
+        newVal,
+        parseFloat(mod.data?.materialGpMarkupRate ?? projMatMarkup)
+      )
+    })
+  }
+
+  // ── Per-project material GP markup rate — same cascade as the sub rate ──
+  function saveProjectMaterialRate(projectId, newVal) {
+    const proj = projects.find(p => p.id === projectId)
+    const projSubMarkup = proj?.sub_gp_markup_rate ?? 0.2
+    applyProjectModuleRecalc(projectId, { material_gp_markup_rate: newVal }, mod => {
+      const gpmd = projectGpmds[projectId] ?? parseFloat(mod.data?.gpmd ?? 425)
+      return recalcModuleFinancials(
+        mod,
+        gpmd,
+        parseFloat(mod.data?.subGpMarkupRate ?? projSubMarkup),
+        newVal
+      )
     })
   }
 
@@ -1276,6 +1311,8 @@ export default function EstimateDetail() {
     gpmd: projectGpmds[selectedProject?.id] ?? editingModule?.data?.gpmd ?? globalGpmd,
     // Sub GP rate always comes from the project — never from stored module data
     subGpMarkupRate: selectedProject?.sub_gp_markup_rate ?? 0.2,
+    // Material GP rate likewise comes from the project. Default 0 = no markup.
+    materialGpMarkupRate: selectedProject?.material_gp_markup_rate ?? 0,
     // Notes live as a top-level column on estimate_modules (Sam writes
     // takeoffs here via create_estimate_from_takeoff). Surface it here so
     // the module's notes textarea pre-fills when editing.
@@ -1296,6 +1333,7 @@ export default function EstimateDetail() {
       acc.subCost += parseFloat(mod.sub_cost || calc.subCost || 0)
       acc.gp += gp
       acc.subGp += parseFloat(calc.subGp || 0)
+      acc.matGp += parseFloat(calc.matGp || 0)
       acc.commission += parseFloat(calc.commission || gp * 0.12 || 0)
       acc.price += parseFloat(mod.total_price || calc.price || 0)
       return acc
@@ -1308,6 +1346,7 @@ export default function EstimateDetail() {
       subCost: 0,
       gp: 0,
       subGp: 0,
+      matGp: 0,
       commission: 0,
       price: 0,
       totalHrs: 0,
@@ -1370,6 +1409,16 @@ export default function EstimateDetail() {
   // Derived blended rate for display in the Estimate Totals bar (read-only)
   const derivedEstSubRate = et.subCost > 0 ? estimateTotalSubGp / et.subCost : 0.2
 
+  // Estimate-level Material GP: same shape as Sub GP above. Unset rate = 0, so
+  // an estimate with no material markup reports $0 material profit, not a gap.
+  const estimateTotalMaterialGp = projects.reduce((sum, proj) => {
+    const mods = proj.estimate_modules || []
+    const projMat = mods.reduce((s2, m) => s2 + parseFloat(m.material_cost || 0), 0)
+    return sum + projMat * (proj.material_gp_markup_rate ?? 0)
+  }, 0)
+  const derivedEstMatRate =
+    et.materialCost > 0 ? estimateTotalMaterialGp / et.materialCost : 0
+
   // ── Per-project totals for selected project ────────────────────────────────
   const projModules = selectedProject?.estimate_modules || []
   const projectTotals = projModules.reduce(
@@ -1383,11 +1432,13 @@ export default function EstimateDetail() {
       acc.subCost += parseFloat(mod.sub_cost || calc.subCost || 0)
       acc.gp += parseFloat(mod.gross_profit || calc.gp || 0)
       acc.subGp += parseFloat(calc.subGp || 0)
+      acc.matGp += parseFloat(calc.matGp || 0)
       acc.commission += parseFloat(calc.commission || 0)
       acc.price += parseFloat(mod.total_price || calc.price || 0)
       return acc
     },
-    { totalHrs: 0, manDays: 0, materialCost: 0, laborCost: 0, burden: 0, subCost: 0, gp: 0, subGp: 0, commission: 0, price: 0 }
+    { totalHrs: 0, manDays: 0, materialCost: 0, laborCost: 0, burden: 0, subCost: 0, gp: 0, subGp: 0,
+      matGp: 0, commission: 0, price: 0 }
   )
   const pt = projectTotals
   const projGpmd = pt.manDays > 0 ? Math.round(pt.gp / pt.manDays) : 425
@@ -1839,6 +1890,8 @@ export default function EstimateDetail() {
             directPrice={et.price}
             price={et.price}
             subMarkupRate={derivedEstSubRate}
+            materialMarkupRate={derivedEstMatRate}
+            directMaterialGp={estimateTotalMaterialGp}
             inHouseLabel="In House Labor Estimate"
             subLabel="Subcontractor Estimate"
             materialsLabel="Materials Estimate"
@@ -1873,6 +1926,8 @@ export default function EstimateDetail() {
             onGpmdSave={val => saveProjectGpmd(selectedProject.id, val)}
             subMarkupRate={selectedProject.sub_gp_markup_rate ?? 0.2}
             onSubMarkupSave={val => saveProjectSubRate(selectedProject.id, val)}
+            materialMarkupRate={selectedProject.material_gp_markup_rate ?? 0}
+            onMaterialMarkupSave={val => saveProjectMaterialRate(selectedProject.id, val)}
             inHouseLabel={`In House Labor ${selectedProject.project_name} Project`}
             subLabel={`Subcontractor ${selectedProject.project_name} Project`}
             materialsLabel={`Materials ${selectedProject.project_name} Project`}

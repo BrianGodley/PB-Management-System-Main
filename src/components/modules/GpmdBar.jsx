@@ -40,10 +40,10 @@ export default function GpmdBar({
   onGpmdSave = null, // if provided → PROJECT mode (editable GPMD)
   subMarkupRate = 0.2, // Sub GP = subCost × subMarkupRate
   onSubMarkupSave = null, // if provided → Sub % cell is editable
-  // Materials group (full layout only). No default rate: an unset material
-  // markup shows "—" rather than resolving to a constant, so an unpriced
-  // materials line is visible instead of silently reading as 0%.
-  materialMarkupRate = null, // Material GP = totalMat × materialMarkupRate
+  // Materials group (full layout only). Mirrors the Sub markup, but defaults to
+  // 0% — no markup is a real, deliberate state here (materials sold at cost),
+  // not a missing rate, so it displays as 0% and $0 rather than a dash.
+  materialMarkupRate = 0, // Material GP = totalMat × materialMarkupRate
   onMaterialMarkupSave = null, // if provided → Material % cell is editable
   directMaterialGp = null, // aggregate bars: summed module material GP
   sticky = false, // when true: renders with sticky positioning (handled by parent wrapper)
@@ -96,20 +96,12 @@ export default function GpmdBar({
   // Materials mirror the Sub group, with one difference: there is no default
   // rate. Both stay null when nothing is set, and the cells render "—".
   const materialGp =
-    directMaterialGp != null
-      ? directMaterialGp
-      : materialMarkupRate != null
-        ? (totalMat || 0) * materialMarkupRate
-        : null
+    directMaterialGp != null ? directMaterialGp : (totalMat || 0) * (materialMarkupRate || 0)
   const displayMatPct = onMaterialMarkupSave
-    ? materialMarkupRate != null
-      ? pct1(materialMarkupRate)
-      : null
+    ? pct1(materialMarkupRate || 0)
     : directMaterialGp != null && (totalMat || 0) > 0
       ? pct1(directMaterialGp / totalMat)
-      : materialMarkupRate != null
-        ? pct1(materialMarkupRate)
-        : null
+      : pct1(materialMarkupRate || 0)
   // Commission + Total Price are variant-specific so each module tab shows only
   // ITS side's total: In-House = labour+burden+materials+GP; Sub = subCost+SubGP.
   // 'full' (project/estimate) combines everything.
@@ -152,7 +144,7 @@ export default function GpmdBar({
   // ── Material % edit handlers ──────────────────────────────────────────────
   function startMatEdit() {
     if (!onMaterialMarkupSave) return
-    setDraftMatPct(displayMatPct == null ? '' : String(displayMatPct))
+    setDraftMatPct(String(displayMatPct))
     setEditingMatPct(true)
   }
   function commitMatEdit() {
@@ -161,12 +153,15 @@ export default function GpmdBar({
     setEditingMatPct(false)
   }
 
-  // ── GPMD cell ──────────────────────────────────────────────────────────────
+  // ── GLPMD cell ─────────────────────────────────────────────────────────────
+  // Gross Labor Profit per Man Day. Light yellow: the blue it used to wear now
+  // belongs to Total Price, and yellow keeps it distinct from the orange markup
+  // boxes and the green profit figures either side of it.
   function GpmdCell() {
     if (onGpmdSave && editingGpmd) {
       return (
-        <div className="rounded-lg bg-blue-500/20 border border-blue-400/50 px-3 py-1 text-center min-w-[68px]">
-          <p className="text-xs mb-0.5 whitespace-nowrap text-blue-300">GPMD</p>
+        <div className="rounded-lg bg-yellow-400/20 border border-yellow-300/50 px-3 py-1 text-center min-w-[68px]">
+          <p className="text-xs mb-0.5 whitespace-nowrap text-yellow-200">GLPMD</p>
           <input
             autoFocus
             value={draftGpmd}
@@ -176,22 +171,22 @@ export default function GpmdBar({
               if (e.key === 'Enter') commitGpmdEdit()
               if (e.key === 'Escape') setEditingGpmd(false)
             }}
-            className="w-16 bg-gray-800 border border-blue-400 rounded text-blue-200 text-sm font-bold text-center tabular-nums outline-none px-1"
+            className="w-16 bg-gray-800 border border-yellow-300 rounded text-yellow-100 text-sm font-bold text-center tabular-nums outline-none px-1"
           />
         </div>
       )
     }
     return (
       <div
-        className={`rounded-lg bg-blue-500/20 border border-blue-400/30 px-3 py-1 text-center min-w-[68px] ${onGpmdSave ? 'cursor-pointer hover:bg-blue-500/30 transition-colors' : ''}`}
+        className={`rounded-lg bg-yellow-400/20 border border-yellow-300/30 px-3 py-1 text-center min-w-[68px] ${onGpmdSave ? 'cursor-pointer hover:bg-yellow-400/30 transition-colors' : ''}`}
         onClick={startGpmdEdit}
-        title={onGpmdSave ? 'Click to edit GPMD' : undefined}
+        title={onGpmdSave ? 'Click to edit GLPMD' : undefined}
       >
-        <p className="text-xs mb-0.5 whitespace-nowrap text-blue-300">
-          GPMD
-          <span className={`text-blue-500 text-[10px] ml-1 ${onGpmdSave ? '' : 'invisible'}`}>✎</span>
+        <p className="text-xs mb-0.5 whitespace-nowrap text-yellow-200">
+          GLPMD
+          <span className={`text-yellow-400 text-[10px] ml-1 ${onGpmdSave ? '' : 'invisible'}`}>✎</span>
         </p>
-        <p className="font-bold tabular-nums text-sm text-blue-200">
+        <p className="font-bold tabular-nums text-sm text-yellow-100">
           ${displayGpmd.toLocaleString()}
         </p>
       </div>
@@ -345,9 +340,7 @@ export default function GpmdBar({
           Markup
           <span className={`text-orange-500 text-[10px] ml-1 ${onMaterialMarkupSave ? '' : 'invisible'}`}>✎</span>
         </p>
-        <p className="font-bold tabular-nums text-sm text-orange-200">
-          {displayMatPct == null ? '—' : `${displayMatPct}%`}
-        </p>
+        <p className="font-bold tabular-nums text-sm text-orange-200">{displayMatPct}%</p>
       </div>
     )
   }
@@ -381,7 +374,7 @@ export default function GpmdBar({
               <div className="flex-1 min-w-0 self-center flex justify-center">
                 <GpmdCell />
               </div>
-              <Cell label="Gross Profit" value={fmt(effectiveGp)} />
+              <Cell label="Gross Profit" value={fmt(effectiveGp)} color="text-green-400" />
             </div>
           </div>
 
@@ -395,7 +388,7 @@ export default function GpmdBar({
               <div className="flex-1 min-w-0 self-center flex justify-center">
                 <MarkupBox />
               </div>
-              <Cell label="Gross Profit" value={fmt(subGp)} />
+              <Cell label="Gross Profit" value={fmt(subGp)} color="text-green-400" />
             </div>
           </div>
 
@@ -409,7 +402,7 @@ export default function GpmdBar({
               <div className="flex-1 min-w-0 self-center flex justify-center">
                 <MaterialMarkupBox />
               </div>
-              <Cell label="Gross Profit" value={materialGp == null ? '—' : fmt(materialGp)} />
+              <Cell label="Gross Profit" value={fmt(materialGp)} color="text-green-400" />
             </div>
           </div>
 
@@ -421,7 +414,7 @@ export default function GpmdBar({
             <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-green-400/70 bg-gray-900 py-1.5 px-1">
               <Cell label="Commission" value={fmt(effectiveComm)} dim="12%" />
               <Cell label="Total Gross Profit" value={fmt(effectiveGp + subGp)} />
-              <Cell label="Total Price" value={fmt(effectivePrice)} color="text-green-400" big />
+              <Cell label="Total Price" value={fmt(effectivePrice)} color="text-blue-300" big />
             </div>
           </div>
         </div>

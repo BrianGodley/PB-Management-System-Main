@@ -418,3 +418,22 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   baked INTO the material figure (`totalMat = markedUpMat + manMat`) rather than tracked
   separately. Until the rate source is decided the Materials group renders "—" for markup
   and GP. Totals still read `effectiveGp + subGp` — material GP is deliberately not added.
+
+## Materials markup — editable per project, 0% default, GLPMD rename
+
+- `estimate_projects.material_gp_markup_rate numeric default 0` added (staging + prod).
+  Mirrors `sub_gp_markup_rate`; the save path spreads the project object, so it persists
+  with no change to the insert code.
+- `recalcModuleFinancials(mod, gpmd, subMarkup, matMarkup)` now computes
+  `matGp = material_cost × matMarkup` and folds it into BOTH the commission base and the
+  total price, exactly as sub GP is folded in. Default 0 means an estimate nobody has set
+  a material markup on prices identically to before the field existed.
+- `saveProjectMaterialRate` cascades the rate to every module in the project, the same
+  way `saveProjectSubRate` does. Estimate-level bar shows the blended derived rate
+  (read-only); project-level bar is editable.
+- Display changes: material markup defaults to **0%** and shows `0%` / `$0` rather than a
+  dash — 0% is a deliberate state (materials sold at cost), not a missing rate. Gross
+  Profit is green in all three profit groups. GPMD renamed **GLPMD** and restyled light
+  yellow; Total Price took the blue GLPMD gave up.
+- Specs: four-group layout, 0%/$0 defaults, GLPMD rename (asserts no bare "GPMD" remains),
+  green gross profit in each group.

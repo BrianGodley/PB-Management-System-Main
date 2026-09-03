@@ -72,18 +72,42 @@ test.describe('Estimator', () => {
     await expect(materials.getByText('Gross Profit', { exact: true })).toBeVisible()
   })
 
-  // No-fallback rule: an unset material markup must read as missing, never 0%.
-  test('unset material markup renders as a dash, not a zero', async ({ page }) => {
+  // Material markup defaults to 0%, and 0% is a real state (materials sold at
+  // cost), so it must read "0%" and "$0" — never a dash, which would suggest a
+  // missing rate rather than a deliberate one.
+  test('material markup and profit default to 0% and $0, not dashes', async ({ page }) => {
     await page.goto(ESTIMATE, { waitUntil: 'domcontentloaded' })
     await settle(page)
     const materials = page.locator('div.flex.flex-col', {
       has: page.getByText('Materials Estimate', { exact: true }),
     }).first()
-    const markupValue = materials.locator('p.tabular-nums').first()
-    const text = (await markupValue.textContent())?.trim()
-    // Either a real percentage or an em dash — never "0%", which would mean a
-    // missing rate had silently resolved to a constant.
-    expect(text, `Material markup rendered as "${text}"`).not.toBe('0%')
-    expect(text).toMatch(/^(—|\d+(\.\d+)?%)$/)
+    await expect(materials.getByText('—')).toHaveCount(0)
+    await expect(materials.getByText(/^\d+(\.\d+)?%$/)).toBeVisible()
+    await expect(materials.getByText(/^\$[\d,]+$/)).toHaveCount(2) // cost + gross profit
+  })
+
+  // GPMD was renamed GLPMD (Gross Labor Profit per Man Day) and moved from blue
+  // to light yellow; Total Price took the blue.
+  test('the man-day rate reads GLPMD, not GPMD', async ({ page }) => {
+    await page.goto(ESTIMATE, { waitUntil: 'domcontentloaded' })
+    await settle(page)
+    await expect(page.getByText('GLPMD', { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('GPMD', { exact: true })).toHaveCount(0)
+  })
+
+  // Gross Profit is green in all three profit groups — In House, Sub, Materials.
+  test('gross profit renders green in each profit group', async ({ page }) => {
+    await page.goto(ESTIMATE, { waitUntil: 'domcontentloaded' })
+    await settle(page)
+    for (const group of ['In House Labor Estimate', 'Subcontractor Estimate', 'Materials Estimate']) {
+      const g = page.locator('div.flex.flex-col', {
+        has: page.getByText(group, { exact: true }),
+      }).first()
+      const gp = g.getByText('Gross Profit', { exact: true })
+      await expect(gp, `${group} has no Gross Profit column`).toBeVisible()
+      // The value sits in the sibling <p>; assert it carries the green class.
+      const value = g.locator('p.text-green-400').first()
+      await expect(value, `${group} Gross Profit is not green`).toBeVisible()
+    }
   })
 })
