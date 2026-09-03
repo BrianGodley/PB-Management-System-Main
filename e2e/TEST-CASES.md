@@ -456,3 +456,13 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - Removed as dead code once both variants returned early: the flat `cols` layout, the
   `SubGpCol` amber box, and the mobile More/Less `expanded` state (both bars now stack on
   narrow screens the way the estimate bar does).
+
+## TOTAL PRICE box, no module commission, Labor Cost rename
+
+- TOTAL PRICE moved from a plain column into its own **green box**, matching the yellow
+  GLPMD and orange Markup boxes. Read-only in all three places it renders — it is the sum
+  of the columns to its left, never typed.
+- **Commission removed from the module bars.** It stays on the estimate/project Totals
+  group, where whole-job commission is meaningful. It is still inside `effectivePrice`, so
+  removing the column does not change what TOTAL PRICE reports.
+- **"Crew Labor" renamed "Labor Cost"** in every bar — estimate, project and module.

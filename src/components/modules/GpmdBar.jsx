@@ -50,7 +50,7 @@ export default function GpmdBar({
   // 'full' (default) shows every column — used by the project + estimate
   //   aggregate bars, which combine In-House and Subcontractor totals.
   // 'inhouse' hides Sub Cost + Sub GP (module In-House tab).
-  // 'sub' hides Labor Hours, Man Days, GPMD, Crew Labor, Labor Burden (module Sub tab).
+  // 'sub' shows the subcontractor side only (module Sub tab) — no labour columns.
   variant = 'full',
   // Group headings for the full (Project/Estimate) layout.
   inHouseLabel = 'In House Labor',
@@ -319,7 +319,7 @@ export default function GpmdBar({
               <Cell label="Labor Hours" value={fnum(totalHrs)} />
               <Cell label="Man Days" value={fnum(manDays)} />
               <Cell
-                label="Crew Labor"
+                label="Labor Cost"
                 value={fmt(laborCost)}
                 dim={`@ $${parseFloat(laborRatePerHour).toFixed(0)}/hr`}
               />
@@ -398,7 +398,6 @@ export default function GpmdBar({
             <Cell label="Gross Profit" value={fmt(subGp)} color="text-green-400" />
           </div>
           <div className={`${barCls} lg:flex-[3_1_0%] border border-green-400/70`}>
-            <Cell label="Commission" value={fmt(effectiveComm)} dim="12%" />
             <div className="flex-1 min-w-0 self-center flex justify-center">
               <TotalPriceBox />
             </div>
@@ -415,7 +414,7 @@ export default function GpmdBar({
           <Cell label="Labor Hours" value={fnum(totalHrs)} />
           <Cell label="Man Days" value={fnum(manDays)} />
           <Cell
-            label="Crew Labor"
+            label="Labor Cost"
             value={fmt(laborCost)}
             dim={`@ $${parseFloat(laborRatePerHour).toFixed(0)}/hr`}
           />
