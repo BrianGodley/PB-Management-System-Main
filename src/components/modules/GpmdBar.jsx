@@ -180,7 +180,7 @@ export default function GpmdBar({
       >
         <p className="text-xs mb-0.5 whitespace-nowrap text-yellow-200">
           GLPMD
-          <span className={`text-yellow-400 text-[10px] ml-1 ${onGpmdSave ? '' : 'invisible'}`}>✎</span>
+          {onGpmdSave && <span className="text-yellow-400 text-[10px] ml-1">✎</span>}
         </p>
         <p className="font-bold tabular-nums text-sm text-yellow-100">
           ${displayGpmd.toLocaleString()}
@@ -241,7 +241,7 @@ export default function GpmdBar({
       >
         <p className="text-xs mb-0.5 whitespace-nowrap text-orange-300">
           Markup
-          <span className={`text-orange-500 text-[10px] ml-1 ${onSubMarkupSave ? '' : 'invisible'}`}>✎</span>
+          {onSubMarkupSave && <span className="text-orange-500 text-[10px] ml-1">✎</span>}
         </p>
         <p className="font-bold tabular-nums text-sm text-orange-200">{displaySubPct}%</p>
       </div>
@@ -280,7 +280,7 @@ export default function GpmdBar({
       >
         <p className="text-xs mb-0.5 whitespace-nowrap text-orange-300">
           Markup
-          <span className={`text-orange-500 text-[10px] ml-1 ${onMaterialMarkupSave ? '' : 'invisible'}`}>✎</span>
+          {onMaterialMarkupSave && <span className="text-orange-500 text-[10px] ml-1">✎</span>}
         </p>
         <p className="font-bold tabular-nums text-sm text-orange-200">{displayMatPct}%</p>
       </div>
