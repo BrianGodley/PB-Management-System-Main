@@ -1085,11 +1085,12 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
             lrph={n(state.laborRatePerHour)}
             burden={calc.burden}
             subCost={calc.subCost}
-            gp={calc.gp}
-            commission={calc.commission}
-            price={calc.price}
+            directGp={calc.gp}
+            directCommission={calc.commission}
+            directPrice={calc.price}
             gpmd={n(state.gpmd)}
             subMarkupRate={n(state.subGpMarkupRate)}
+            materialMarkupRate={n(state.materialGpMarkupRate)}
           />
         </div>
         <div className="px-6 py-2">

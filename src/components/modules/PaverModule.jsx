@@ -321,6 +321,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? null)
   const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
   const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
+  // Material markup comes from the project, same as the sub rate. 0 = sold at cost.
+  const [materialGpMarkupRate] = useState(initialData?.materialGpMarkupRate ?? 0)
   const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
   const [walkPace, setWalkPace] = useState(initialData?.walkAccess?.paceLfPerMin ?? null)
   const [walkAccess] = useState(
@@ -671,6 +673,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         laborBurdenPct,
         gpmd,
         subGpMarkupRate,
+        materialGpMarkupRate,
         commissionRate,
         laborRates,
         materialRates,
@@ -749,12 +752,13 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             laborCost={calc.laborCost}
             laborRatePerHour={laborRatePerHour}
             burden={calc.burden}
-            gp={calc.gp}
-            commission={calc.commission}
+            directGp={calc.gp}
+            directCommission={calc.commission}
             subCost={calc.subCost}
             gpmd={gpmd}
-            price={calc.price}
+            directPrice={calc.price}
             subMarkupRate={subGpMarkupRate}
+            materialMarkupRate={materialGpMarkupRate}
           />
         </div>
         <div className="px-6 py-2">

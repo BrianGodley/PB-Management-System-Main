@@ -423,6 +423,8 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
   const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
   const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
+  // Material markup comes from the project, same as the sub rate. 0 = sold at cost.
+  const [materialGpMarkupRate] = useState(initialData?.materialGpMarkupRate ?? 0)
   const [walkAccess] = useState(
     initialData?.walkAccess ?? {
       paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
@@ -771,6 +773,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         gpmd,
         commissionRate,
         subGpMarkupRate,
+        materialGpMarkupRate,
         materialPrices,
         laborRates,
         subRates,
@@ -857,12 +860,13 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
             laborCost={calc.laborCost}
             laborRatePerHour={laborRatePerHour}
             burden={calc.burden}
-            gp={calc.gp}
-            commission={calc.commission}
+            directGp={calc.gp}
+            directCommission={calc.commission}
             subCost={calc.subCost}
             gpmd={gpmd}
-            price={calc.price}
+            directPrice={calc.price}
             subMarkupRate={subGpMarkupRate}
+            materialMarkupRate={materialGpMarkupRate}
           />
         </div>
         <div className="px-6 py-2">

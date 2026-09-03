@@ -366,6 +366,8 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
   const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
   const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
   const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
+  // Material markup comes from the project, same as the sub rate. 0 = sold at cost.
+  const [materialGpMarkupRate] = useState(initialData?.materialGpMarkupRate ?? 0)
 
   // Free-text notes for this module — Sam writes auto-generated
   // takeoffs here via create_estimate_from_takeoff, and the user can
@@ -749,12 +751,13 @@ export default function GroundTreatmentsModule({ onSave, onBack, saving, initial
             laborCost={calc.laborCost}
             laborRatePerHour={laborRatePerHour}
             burden={calc.burden}
-            gp={calc.gp}
-            commission={calc.commission}
+            directGp={calc.gp}
+            directCommission={calc.commission}
             subCost={calc.subCost}
             gpmd={gpmd}
-            price={calc.price}
+            directPrice={calc.price}
             subMarkupRate={subGpMarkupRate}
+            materialMarkupRate={materialGpMarkupRate}
             variant={isSub ? 'sub' : 'inhouse'}
           />
         </div>

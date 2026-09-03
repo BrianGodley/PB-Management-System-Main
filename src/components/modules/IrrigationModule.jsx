@@ -253,6 +253,8 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
   const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
   const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
   const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
+  // Material markup comes from the project, same as the sub rate. 0 = sold at cost.
+  const [materialGpMarkupRate] = useState(initialData?.materialGpMarkupRate ?? 0)
 
   // ── Shared (not per-tab) selections ─────────────────────────────────────────
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Landscape')
@@ -437,6 +439,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
         subData: subTab,
         subType,
         subGpMarkupRate,
+        materialGpMarkupRate,
         commissionRate,
         crewType,
         laborRatePerHour,
@@ -513,12 +516,13 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
             laborCost={calc.laborCost}
             laborRatePerHour={laborRatePerHour}
             burden={calc.burden}
-            gp={calc.gp}
-            commission={calc.commission}
+            directGp={calc.gp}
+            directCommission={calc.commission}
             subCost={calc.subCost}
             gpmd={gpmd}
-            price={calc.price}
+            directPrice={calc.price}
             subMarkupRate={subGpMarkupRate}
+            materialMarkupRate={materialGpMarkupRate}
           />
         </div>
         <div className="px-6 py-2">

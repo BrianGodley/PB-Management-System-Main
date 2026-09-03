@@ -872,6 +872,8 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
 
   const gpmd = initialData?.gpmd ?? gpmdDefault
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? subGpMarkupRateDefault
+  // Material markup comes from the project, same as the sub rate. 0 = sold at cost.
+  const materialGpMarkupRate = initialData?.materialGpMarkupRate ?? 0
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
@@ -951,6 +953,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
     walkAccess,
     laborBurdenPct,
     subGpMarkupRate,
+    materialGpMarkupRate,
     commissionRate,
     priceOf
   )
@@ -990,6 +993,7 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
         laborBurdenPct,
         gpmd,
         subGpMarkupRate,
+        materialGpMarkupRate,
         commissionRate,
         laborRates,
         materialRates,
@@ -1045,12 +1049,13 @@ export default function StepsModule({ onSave, onBack, saving, initialData }) {
             laborCost={calc.laborCost}
             laborRatePerHour={laborRatePerHour}
             burden={calc.burden}
-            gp={calc.gp}
-            commission={calc.commission}
+            directGp={calc.gp}
+            directCommission={calc.commission}
             subCost={calc.subCost}
             gpmd={gpmd}
-            price={calc.price}
+            directPrice={calc.price}
             subMarkupRate={subGpMarkupRate}
+            materialMarkupRate={materialGpMarkupRate}
           />
         </div>
         <div className="px-6 py-2">

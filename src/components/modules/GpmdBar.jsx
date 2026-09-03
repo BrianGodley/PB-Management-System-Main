@@ -66,10 +66,6 @@ export default function GpmdBar({
   const [draftSubPct, setDraftSubPct] = useState('')
   const [editingMatPct, setEditingMatPct] = useState(false)
   const [draftMatPct, setDraftMatPct] = useState('')
-  // On phones the bar collapses to just GPMD / Gross Profit / Total Price; the
-  // rest reveal via the More toggle (and wrap onto extra rows). Desktop (lg)
-  // always shows everything.
-  const [expanded, setExpanded] = useState(false)
 
   // Previously: `if (price <= 0) return null` — but the module-level
   // sticky wrapper has its own padding, so returning null left a thin
@@ -193,61 +189,7 @@ export default function GpmdBar({
     )
   }
 
-  // ── Sub % cell ─────────────────────────────────────────────────────────────
-  const cols = [
-    { label: 'Labor Hours', value: fnum(totalHrs), dim: 'hrs' },
-    { label: 'Man Days', value: fnum(manDays), dim: 'MD' },
-    { label: 'Materials', value: fmt2(totalMat), dim: null },
-    {
-      label: 'Crew Labor',
-      value: fmt(laborCost),
-      dim: `@ $${parseFloat(laborRatePerHour).toFixed(0)}/hr`,
-    },
-    { label: 'Labor Burden', value: fmt(burden), dim: '29%' },
-    { label: 'Sub Cost', value: subCost > 0 ? fmt(subCost) : '—', dim: null },
-    { label: 'Commission', value: fmt(effectiveComm), dim: '12%' },
-    { label: 'Gross Profit', value: fmt(effectiveGp), dim: null, green: true },
-    { label: 'TOTAL PRICE', value: fmt(effectivePrice), dim: null, blue: true, big: true },
-  ]
 
-  // ── Sub GP box — styled like the GPMD box (amber), rate inline-editable ────
-  function SubGpCol() {
-    return (
-      <div className={`px-1 shrink-0 self-center ${expanded ? '' : 'hidden lg:block'}`}>
-        <div className="rounded-lg bg-amber-500/20 border border-amber-400/30 px-3 py-1 text-center min-w-[68px]">
-          <p className="text-xs mb-0.5 whitespace-nowrap text-amber-300">Sub GP</p>
-          <p className="font-bold tabular-nums text-sm text-amber-200">
-            {subGp > 0 ? fmt(subGp) : '—'}
-          </p>
-          {/* Editable rate shown below the value */}
-          {editingSubPct ? (
-            <div className="flex items-center justify-center gap-0.5 mt-0.5">
-              <input
-                autoFocus
-                value={draftSubPct}
-                onChange={e => setDraftSubPct(e.target.value)}
-                onBlur={commitSubEdit}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') commitSubEdit()
-                  if (e.key === 'Escape') setEditingSubPct(false)
-                }}
-                className="w-8 bg-gray-800 border border-amber-400 rounded text-amber-200 text-xs font-bold text-center tabular-nums outline-none px-0.5"
-              />
-              <span className="text-amber-300 text-xs font-bold">%</span>
-            </div>
-          ) : (
-            <p
-              className={`text-xs text-amber-400/70 whitespace-nowrap mt-0.5 ${onSubMarkupSave ? 'cursor-pointer hover:text-amber-300 transition-colors' : ''}`}
-              onClick={onSubMarkupSave ? startSubEdit : undefined}
-              title={onSubMarkupSave ? 'Click to edit Sub GP markup rate' : undefined}
-            >
-              {displaySubPct}%{onSubMarkupSave && <span className="ml-1 text-amber-500">✎</span>}
-            </p>
-          )}
-        </div>
-      </div>
-    )
-  }
 
   const containerCls = sticky
     ? 'bg-gray-900 text-white py-1 px-2'
@@ -422,19 +364,30 @@ export default function GpmdBar({
     )
   }
 
-  // ── Subcontractor tab (module) — fixed order:
-  //    Sub Cost · Markup (orange box) · Gross Profit · Commission · Total Price
+  // ── Module tabs — two unlabelled bars, same shape as the estimate bar ──────
+  // Sub tab:      [ sub cost · markup · gross profit ] [ commission · total ]
+  // In-House tab: [ hours · days · labor · burden · GLPMD · GP ] [ materials ·
+  //               GP · total ]
+  // No group headings here: the tab the user is already on says which side of
+  // the job this is, so a label would only repeat it.
+  const barCls =
+    'min-w-0 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg bg-gray-900 py-1.5 px-1'
+
   if (isSubView) {
     return (
       <div className={containerCls}>
-        <div className="flex gap-0 divide-x divide-white/10 items-stretch">
-          <Cell label="Sub Cost" value={subCost > 0 ? fmt(subCost) : '—'} />
-          <div className="flex-1 min-w-0 self-center flex justify-center px-1">
-            <MarkupBox />
+        <div className="flex flex-col lg:flex-row gap-2 items-stretch">
+          <div className={`${barCls} lg:flex-[6_1_0%] border border-orange-400/70`}>
+            <Cell label="Sub Cost" value={subCost > 0 ? fmt(subCost) : '—'} />
+            <div className="flex-1 min-w-0 self-center flex justify-center">
+              <MarkupBox />
+            </div>
+            <Cell label="Gross Profit" value={fmt(subGp)} color="text-green-400" />
           </div>
-          <Cell label="Gross Profit" value={subGp > 0 ? fmt(subGp) : '—'} />
-          <Cell label="Commission" value={fmt(effectiveComm)} dim="12%" />
-          <Cell label="TOTAL PRICE" value={fmt(effectivePrice)} color="text-blue-400" big />
+          <div className={`${barCls} lg:flex-[3_1_0%] border border-green-400/70`}>
+            <Cell label="Commission" value={fmt(effectiveComm)} dim="12%" />
+            <Cell label="TOTAL PRICE" value={fmt(effectivePrice)} color="text-blue-300" big />
+          </div>
         </div>
       </div>
     )
@@ -442,69 +395,26 @@ export default function GpmdBar({
 
   return (
     <div className={containerCls}>
-      <div className="flex gap-0 divide-x divide-white/10 flex-wrap">
-        {/* Data columns — filtered by variant. In-house drops Sub Cost;
-            Sub view drops the labour/man-day/GPMD columns.
-            The Sub GP + GPMD boxes are inserted just before Commission so the
-            order reads: … Sub GP, GPMD, Commission, Gross Profit, Total Price. */}
-        {cols
-          .filter(col => {
-            if (isSubView)
-              return ![
-                'Labor Hours',
-                'Man Days',
-                'Crew Labor',
-                'Labor Burden',
-                'Materials',
-                'Gross Profit',
-              ].includes(col.label)
-            if (isInhouseView) return col.label !== 'Sub Cost'
-            return true // full: show everything
-          })
-          .map(col => {
-          // Sub GP + GPMD boxes are inserted immediately before the Commission
-          // column, so both sit to the left of Gross Profit.
-          const insertBoxes = col.label === 'Commission'
-          // Always visible (even collapsed on mobile): Gross Profit + Total Price.
-          const essential = col.label === 'Gross Profit' || col.label === 'TOTAL PRICE'
-          const hideCls = essential || expanded ? '' : 'hidden lg:block'
-          // Use a keyed Fragment so React stops warning about missing keys
-          // on this iterator (shorthand <> can't accept a key prop).
-          return (
-            <React.Fragment key={col.label}>
-              {insertBoxes && !isInhouseView && <SubGpCol />}
-              {insertBoxes && !isSubView && (
-                <div className="w-24 shrink-0 self-center flex justify-center">
-                  <GpmdCell />
-                </div>
-              )}
-              <div className={`px-1.5 flex-1 min-w-0 text-center ${hideCls}`}>
-                <p className="text-[10px] text-gray-400 truncate mb-0.5">{col.label}</p>
-                <p
-                  className={`font-bold tabular-nums truncate ${
-                    col.big
-                      ? 'text-base text-blue-400'
-                      : col.green
-                        ? 'text-sm text-green-400'
-                        : 'text-sm text-white'
-                  }`}
-                >
-                  {col.value}
-                </p>
-                {col.dim && <p className="text-[10px] text-gray-500 truncate">{col.dim}</p>}
-              </div>
-            </React.Fragment>
-          )
-        })}
-
-        {/* Mobile-only expand/collapse toggle */}
-        <button
-          type="button"
-          onClick={() => setExpanded(e => !e)}
-          className="lg:hidden shrink-0 self-center ml-1 px-2 py-1 text-[10px] font-semibold text-gray-200 hover:text-white rounded-md border border-white/25"
-        >
-          {expanded ? 'Less ▴' : 'More ▾'}
-        </button>
+      <div className="flex flex-col lg:flex-row gap-2 items-stretch">
+        <div className={`${barCls} lg:flex-[6_1_0%] border border-blue-400/70`}>
+          <Cell label="Labor Hours" value={fnum(totalHrs)} />
+          <Cell label="Man Days" value={fnum(manDays)} />
+          <Cell
+            label="Crew Labor"
+            value={fmt(laborCost)}
+            dim={`@ $${parseFloat(laborRatePerHour).toFixed(0)}/hr`}
+          />
+          <Cell label="Labor Burden" value={fmt(burden)} dim="29%" />
+          <div className="flex-1 min-w-0 self-center flex justify-center">
+            <GpmdCell />
+          </div>
+          <Cell label="Gross Profit" value={fmt(effectiveGp)} color="text-green-400" />
+        </div>
+        <div className={`${barCls} lg:flex-[3_1_0%] border border-orange-400/70`}>
+          <Cell label="Materials" value={fmt2(totalMat)} />
+          <Cell label="Gross Profit" value={fmt(materialGp)} color="text-green-400" />
+          <Cell label="TOTAL PRICE" value={fmt(effectivePrice)} color="text-blue-300" big />
+        </div>
       </div>
     </div>
   )

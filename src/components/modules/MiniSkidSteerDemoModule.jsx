@@ -415,6 +415,8 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
 
   const gpmd = initialData?.gpmd ?? gpmdDefault
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? subGpMarkupRateDefault
+  // Material markup comes from the project, same as the sub rate. 0 = sold at cost.
+  const materialGpMarkupRate = initialData?.materialGpMarkupRate ?? 0
   const calcRaw = calcDemo(
     state,
     laborRatePerHour,
@@ -470,6 +472,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
         laborBurdenPct,
         gpmd,
         subGpMarkupRate,
+        materialGpMarkupRate,
         commissionRate,
         materialPrices,
         laborRates,
@@ -509,12 +512,13 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             laborCost={calc.laborCost}
             laborRatePerHour={laborRatePerHour}
             burden={calc.burden}
-            gp={calc.gp}
-            commission={calc.commission}
+            directGp={calc.gp}
+            directCommission={calc.commission}
             subCost={calc.subCost}
             gpmd={gpmd}
-            price={calc.price}
+            directPrice={calc.price}
             subMarkupRate={subGpMarkupRate}
+            materialMarkupRate={materialGpMarkupRate}
           />
         </div>
         <div className="px-6 py-2">

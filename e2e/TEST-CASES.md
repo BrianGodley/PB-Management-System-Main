@@ -437,3 +437,22 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   yellow; Total Price took the blue GLPMD gave up.
 - Specs: four-group layout, 0%/$0 defaults, GLPMD rename (asserts no bare "GPMD" remains),
   green gross profit in each group.
+
+## Module bars — two bars per tab, and the dropped-props bug
+
+- Every module's summary bar was ONE flat row. It is now two unlabelled bars, matching the
+  estimate bar's shape. No group headings: the tab already says which side of the job it is.
+  - In-House: `[ Labor Hours · Man Days · Crew Labor · Labor Burden · GLPMD · Gross Profit ]`
+    then `[ Materials · Gross Profit · TOTAL PRICE ]`
+  - Sub: `[ Sub Cost · Markup · Gross Profit ]` then `[ Commission · TOTAL PRICE ]`
+- BUG FIXED: all 20 modules passed `gp`, `commission` and `price`, but GpmdBar only accepts
+  `directGp` / `directCommission` / `directPrice`. All three were silently dropped, so
+  **Commission read $0 on every module bar and TOTAL PRICE was understated by the
+  commission**. Renamed at all 20 call sites; the bar now shows the module's own figures.
+- `materialMarkupRate` is threaded through all 20 modules so the second in-house bar can
+  show material gross profit. 15 modules take it via `useState(initialData?…)`; HandDemo,
+  MiniSkidSteer, SkidSteer and Steps derive it as a const beside their existing
+  `subGpMarkupRate` const; Pool reads it from `state`.
+- Removed as dead code once both variants returned early: the flat `cols` layout, the
+  `SubGpCol` amber box, and the mobile More/Less `expanded` state (both bars now stack on
+  narrow screens the way the estimate bar does).

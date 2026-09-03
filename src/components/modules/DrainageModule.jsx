@@ -251,6 +251,8 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
   )
   const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
   const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
+  // Material markup comes from the project, same as the sub rate. 0 = sold at cost.
+  const [materialGpMarkupRate] = useState(initialData?.materialGpMarkupRate ?? 0)
   const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
 
   // Free-text notes for this module — Sam writes auto-generated
@@ -462,6 +464,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
     laborBurdenPct,
     subRates,
     subGpMarkupRate,
+    materialGpMarkupRate,
     materialRows,
     catDefaults,
     commissionRate
@@ -538,6 +541,7 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
         laborBurdenPct,
         gpmd,
         subGpMarkupRate,
+        materialGpMarkupRate,
         commissionRate,
         walkAccess,
         materialPrices, // snapshot of prices used — so the summary always reflects save-time costs
@@ -592,12 +596,13 @@ export default function DrainageModule({ onSave, onBack, saving, initialData }) 
             laborCost={calc.laborCost}
             laborRatePerHour={laborRatePerHour}
             burden={calc.burden}
-            gp={calc.gp}
-            commission={calc.commission}
+            directGp={calc.gp}
+            directCommission={calc.commission}
             subCost={calc.subCost}
             gpmd={gpmd}
-            price={calc.price}
+            directPrice={calc.price}
             subMarkupRate={subGpMarkupRate}
+            materialMarkupRate={materialGpMarkupRate}
             variant={isSub ? 'sub' : 'inhouse'}
           />
         </div>

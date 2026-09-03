@@ -662,6 +662,8 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
   )
   const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
   const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
+  // Material markup comes from the project, same as the sub rate. 0 = sold at cost.
+  const [materialGpMarkupRate] = useState(initialData?.materialGpMarkupRate ?? 0)
   const [commissionRate, setCommissionRate] = useState(initialData?.commissionRate ?? null)
 
   const [notes, setNotes] = useState(initialData?.notes ?? '')
@@ -813,6 +815,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
       distanceLF,
       subType,
       subGpMarkupRate,
+      materialGpMarkupRate,
       commissionRate,
     },
     laborRatePerHour,
@@ -901,6 +904,7 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
         crewType,
         subType,
         subGpMarkupRate,
+        materialGpMarkupRate,
         commissionRate,
         laborRatePerHour,
         laborBurdenPct,
@@ -974,12 +978,13 @@ export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
               laborCost={calc.laborCost}
               laborRatePerHour={laborRatePerHour}
               burden={calc.burden}
-              gp={calc.gp}
-              commission={calc.commission}
+              directGp={calc.gp}
+              directCommission={calc.commission}
               subCost={calc.subCost}
               gpmd={gpmd}
-              price={calc.price}
+              directPrice={calc.price}
               subMarkupRate={subGpMarkupRate}
+            materialMarkupRate={materialGpMarkupRate}
             />
           </div>
           <div className="px-6 py-2">
