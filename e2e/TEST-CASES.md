@@ -466,3 +466,14 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   group, where whole-job commission is meaningful. It is still inside `effectivePrice`, so
   removing the column does not change what TOTAL PRICE reports.
 - **"Crew Labor" renamed "Labor Cost"** in every bar — estimate, project and module.
+
+## Boxed figures — GLPMD, Gross Profit, Price
+
+- Every derived figure is now a coloured box rather than a plain column, so the bar reads
+  as inputs (plain columns) vs outputs (boxes):
+  - **GLPMD** yellow, editable · **Markup** orange, editable
+  - **Gross Profit** green, read-only — all four: in house, sub, materials, total
+  - **Price** blue, read-only
+- "TOTAL PRICE" reverted to sentence case and shortened to **"Price"**.
+- Spec note: the boxed value carries `text-green-200` inside a green border, NOT the old
+  `text-green-400` plain-cell class — the green-profit test asserts the new class.

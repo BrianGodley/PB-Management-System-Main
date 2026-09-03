@@ -287,12 +287,23 @@ export default function GpmdBar({
     )
   }
 
+  // ── Gross profit box — green, matching the yellow GLPMD and blue Price boxes.
+  //    Read-only: profit is derived from the columns beside it.
+  function GpBox({ label = 'Gross Profit', value }) {
+    return (
+      <div className="rounded-lg bg-green-500/20 border border-green-400/30 px-3 py-1 text-center min-w-[72px]">
+        <p className="text-xs mb-0.5 whitespace-nowrap text-green-300">{label}</p>
+        <p className="font-bold tabular-nums text-sm text-green-200">{value}</p>
+      </div>
+    )
+  }
+
   // ── Total price box — green, same treatment as the GLPMD and Markup boxes.
   //    Read-only: the price is the sum of everything left of it, never typed.
   function TotalPriceBox() {
     return (
       <div className="rounded-lg bg-blue-500/20 border border-blue-400/30 px-3 py-1 text-center min-w-[76px]">
-        <p className="text-xs mb-0.5 whitespace-nowrap text-blue-300">TOTAL PRICE</p>
+        <p className="text-xs mb-0.5 whitespace-nowrap text-blue-300">Price</p>
         <p className="font-bold tabular-nums text-base text-blue-200">{fmt(effectivePrice)}</p>
       </div>
     )
@@ -327,7 +338,9 @@ export default function GpmdBar({
               <div className="flex-1 min-w-0 self-center flex justify-center">
                 <GpmdCell />
               </div>
-              <Cell label="Gross Profit" value={fmt(effectiveGp)} color="text-green-400" />
+              <div className="flex-1 min-w-0 self-center flex justify-center">
+                <GpBox value={fmt(effectiveGp)} />
+              </div>
             </div>
           </div>
 
@@ -341,7 +354,9 @@ export default function GpmdBar({
               <div className="flex-1 min-w-0 self-center flex justify-center">
                 <MarkupBox />
               </div>
-              <Cell label="Gross Profit" value={fmt(subGp)} color="text-green-400" />
+              <div className="flex-1 min-w-0 self-center flex justify-center">
+                <GpBox value={fmt(subGp)} />
+              </div>
             </div>
           </div>
 
@@ -355,7 +370,9 @@ export default function GpmdBar({
               <div className="flex-1 min-w-0 self-center flex justify-center">
                 <MaterialMarkupBox />
               </div>
-              <Cell label="Gross Profit" value={fmt(materialGp)} color="text-green-400" />
+              <div className="flex-1 min-w-0 self-center flex justify-center">
+                <GpBox value={fmt(materialGp)} />
+              </div>
             </div>
           </div>
 
@@ -366,7 +383,9 @@ export default function GpmdBar({
             </p>
             <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-green-400/70 bg-gray-900 py-1.5 px-1">
               <Cell label="Commission" value={fmt(effectiveComm)} dim="12%" />
-              <Cell label="Total Gross Profit" value={fmt(effectiveGp + subGp)} color="text-green-400" />
+              <div className="flex-1 min-w-0 self-center flex justify-center">
+                <GpBox label="Total Gross Profit" value={fmt(effectiveGp + subGp)} />
+              </div>
               <div className="flex-1 min-w-0 self-center flex justify-center">
               <TotalPriceBox />
             </div>
@@ -395,7 +414,9 @@ export default function GpmdBar({
             <div className="flex-1 min-w-0 self-center flex justify-center">
               <MarkupBox />
             </div>
-            <Cell label="Gross Profit" value={fmt(subGp)} color="text-green-400" />
+            <div className="flex-1 min-w-0 self-center flex justify-center">
+                <GpBox value={fmt(subGp)} />
+              </div>
           </div>
           <div className={`${barCls} lg:flex-[3_1_0%] border border-green-400/70`}>
             <div className="flex-1 min-w-0 self-center flex justify-center">
@@ -422,11 +443,15 @@ export default function GpmdBar({
           <div className="flex-1 min-w-0 self-center flex justify-center">
             <GpmdCell />
           </div>
-          <Cell label="Gross Profit" value={fmt(effectiveGp)} color="text-green-400" />
+          <div className="flex-1 min-w-0 self-center flex justify-center">
+                <GpBox value={fmt(effectiveGp)} />
+              </div>
         </div>
         <div className={`${barCls} lg:flex-[3_1_0%] border border-orange-400/70`}>
           <Cell label="Materials" value={fmt2(totalMat)} />
-          <Cell label="Gross Profit" value={fmt(materialGp)} color="text-green-400" />
+          <div className="flex-1 min-w-0 self-center flex justify-center">
+                <GpBox value={fmt(materialGp)} />
+              </div>
           <div className="flex-1 min-w-0 self-center flex justify-center">
               <TotalPriceBox />
             </div>

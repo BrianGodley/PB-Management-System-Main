@@ -105,9 +105,10 @@ test.describe('Estimator', () => {
       }).first()
       const gp = g.getByText('Gross Profit', { exact: true })
       await expect(gp, `${group} has no Gross Profit column`).toBeVisible()
-      // The value sits in the sibling <p>; assert it carries the green class.
-      const value = g.locator('p.text-green-400').first()
-      await expect(value, `${group} Gross Profit is not green`).toBeVisible()
+      // Gross profit is a boxed figure now, like GLPMD and Price — the value
+      // carries text-green-200 inside a green-bordered box, not text-green-400.
+      const value = g.locator('p.text-green-200').first()
+      await expect(value, `${group} Gross Profit is not a green box`).toBeVisible()
     }
   })
 })
