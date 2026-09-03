@@ -287,6 +287,17 @@ export default function GpmdBar({
     )
   }
 
+  // ── Total price box — green, same treatment as the GLPMD and Markup boxes.
+  //    Read-only: the price is the sum of everything left of it, never typed.
+  function TotalPriceBox() {
+    return (
+      <div className="rounded-lg bg-green-500/20 border border-green-400/30 px-3 py-1 text-center min-w-[76px]">
+        <p className="text-xs mb-0.5 whitespace-nowrap text-green-300">TOTAL PRICE</p>
+        <p className="font-bold tabular-nums text-base text-green-200">{fmt(effectivePrice)}</p>
+      </div>
+    )
+  }
+
   // ── Grouped layout — Project & Estimate (full) bars ────────────────────────
   // Four groups, left to right:
   //   In House Labor (blue)   labour hours/man-days/crew cost/burden + GPMD + GP
@@ -356,7 +367,9 @@ export default function GpmdBar({
             <div className="flex-1 flex items-stretch gap-0 divide-x divide-white/10 rounded-lg border border-green-400/70 bg-gray-900 py-1.5 px-1">
               <Cell label="Commission" value={fmt(effectiveComm)} dim="12%" />
               <Cell label="Total Gross Profit" value={fmt(effectiveGp + subGp)} />
-              <Cell label="TOTAL PRICE" value={fmt(effectivePrice)} color="text-blue-300" big />
+              <div className="flex-1 min-w-0 self-center flex justify-center">
+              <TotalPriceBox />
+            </div>
             </div>
           </div>
         </div>
@@ -386,7 +399,9 @@ export default function GpmdBar({
           </div>
           <div className={`${barCls} lg:flex-[3_1_0%] border border-green-400/70`}>
             <Cell label="Commission" value={fmt(effectiveComm)} dim="12%" />
-            <Cell label="TOTAL PRICE" value={fmt(effectivePrice)} color="text-blue-300" big />
+            <div className="flex-1 min-w-0 self-center flex justify-center">
+              <TotalPriceBox />
+            </div>
           </div>
         </div>
       </div>
@@ -413,7 +428,9 @@ export default function GpmdBar({
         <div className={`${barCls} lg:flex-[3_1_0%] border border-orange-400/70`}>
           <Cell label="Materials" value={fmt2(totalMat)} />
           <Cell label="Gross Profit" value={fmt(materialGp)} color="text-green-400" />
-          <Cell label="TOTAL PRICE" value={fmt(effectivePrice)} color="text-blue-300" big />
+          <div className="flex-1 min-w-0 self-center flex justify-center">
+              <TotalPriceBox />
+            </div>
         </div>
       </div>
     </div>
