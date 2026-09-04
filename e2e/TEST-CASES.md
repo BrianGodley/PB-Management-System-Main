@@ -1006,3 +1006,13 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
      the totals.
 - Module names left-aligned in the breakdown; its headers are sentence case rather than
   uppercase.
+
+## Module Breakdown — labour difference column
+
+- Added **Labor Difference** beside the estimated/actual cost pair, and renamed the existing
+  delta to **MD Difference** so the two are told apart. Both colour the same way: over is
+  red, under green.
+- Verified column counts line up (10 header, 10 body, 8 footer with a colSpan of 3) and the
+  table still fits its pane at 1300px.
+- Tester1 totals: 37.4 → 30.4 MD (▼7.0, 19%) and $9,470 → $7,707 (▼$1,762, 19%) — the two
+  deltas agree in percentage, as they must when both sides use one rate.

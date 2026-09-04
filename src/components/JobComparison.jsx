@@ -242,15 +242,17 @@ function ModuleTable({ workOrders, crewMap, profitRows }) {
               <th className={thCls}>Crew Type</th>
               <th className={thCls}>Estimated Man Days</th>
               <th className={thCls}>Actual Man Days</th>
-              <th className={thCls}>Difference</th>
+              <th className={thCls}>MD Difference</th>
               <th className={thCls}>Estimated Labor</th>
               <th className={thCls}>Actual Labor</th>
+              <th className={thCls}>Labor Difference</th>
               <th className={thCls}>Estimated Materials</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {rows.map(({ wo, estMD, actMD, estMat, estLab, actLab, crew }) => {
               const mdDelta = actMD == null ? null : actMD - estMD
+              const labDelta = actLab == null ? null : actLab - estLab
               return (
                 <tr key={wo.id} className="hover:bg-gray-50">
                   <td className={`${tdCls} text-left`}>
@@ -306,6 +308,22 @@ function ModuleTable({ workOrders, crewMap, profitRows }) {
                   >
                     {actLab == null ? '—' : fmt(actLab)}
                   </td>
+                  <td className="px-3 py-2.5 text-center">
+                    {labDelta != null && (
+                      <span
+                        className={`text-base font-semibold ${
+                          Math.abs(labDelta) < 0.5
+                            ? 'text-gray-400'
+                            : labDelta > 0
+                              ? 'text-red-500'
+                              : 'text-green-600'
+                        }`}
+                      >
+                        {labDelta > 0 ? '+' : ''}
+                        {fmt(labDelta)}
+                      </span>
+                    )}
+                  </td>
                   <td className={tdCls}>{estMat > 0 ? fmt(estMat) : '—'}</td>
                 </tr>
               )
@@ -326,6 +344,9 @@ function ModuleTable({ workOrders, crewMap, profitRows }) {
               <td className="px-3 py-2.5 text-base text-center">{fmt(totEstLab)}</td>
               <td className="px-3 py-2.5 text-base text-center text-blue-700">
                 {totActLab > 0 ? fmt(totActLab) : '—'}
+              </td>
+              <td className="px-3 py-2.5 text-center">
+                {totActLab > 0 && <DeltaBadge est={totEstLab} act={totActLab} currency inverse />}
               </td>
               <td className="px-3 py-2.5 text-base text-center">{fmt(totEstMat)}</td>
             </tr>
