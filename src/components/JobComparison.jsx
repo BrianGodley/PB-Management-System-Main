@@ -98,7 +98,7 @@ function Pair({
         : 'text-green-400'
   return (
     <div className="flex-1 min-w-0 px-3 py-1.5">
-      <p className="text-[10px] text-gray-400 truncate">{label}</p>
+      <p className="text-[10px] font-bold text-gray-300 text-center truncate">{label}</p>
       <div className="flex items-start justify-between gap-2 mt-0.5 min-w-0">
         <div className="min-w-0">
           <p className="text-[9px] text-gray-500 uppercase tracking-wide">Est</p>
@@ -127,7 +127,7 @@ function Pair({
 function Single({ label, value, currency = false, unknown = false, unknownNote, tone = 'text-white', note }) {
   return (
     <div className="flex-1 min-w-0 px-3 py-1.5 self-center">
-      <p className="text-[10px] text-gray-400 truncate">{label}</p>
+      <p className="text-[10px] font-bold text-gray-300 text-center truncate">{label}</p>
       {unknown ? (
         <p className="text-sm font-bold text-gray-500 mt-0.5 truncate" title={unknownNote}>
           not yet known
