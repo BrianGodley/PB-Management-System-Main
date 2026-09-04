@@ -105,8 +105,6 @@ export default function ModuleCompletionGrid({
   // Dollars of profit banked as at a date.
   const jobEarnedAt = date =>
     (modules || []).reduce((sum, m) => sum + (cumAt(m.id, date) / 100) * worthOf(m), 0)
-  // The same thing as a share of the job.
-  const jobCumAt = date => (glpeTotal > 0 ? (jobEarnedAt(date) / glpeTotal) * 100 : 0)
 
   const cellValue = (moduleId, date) => {
     const row = (completions || []).find(
@@ -297,11 +295,11 @@ export default function ModuleCompletionGrid({
               return (
                 <tr key={m.id} className="border-b border-gray-50 last:border-0">
                   <td className="py-2 px-4">
-                    <span className="font-medium text-gray-800">
+                    <span className="text-base font-semibold text-gray-800">
                       {m.module_name || m.module_type}
                     </span>
-                    <span className="text-gray-400 text-xs ml-1.5">{m.project_name}</span>
-                    <span className="block text-[11px] text-gray-400">
+                    <span className="text-gray-400 text-sm ml-1.5">{m.project_name}</span>
+                    <span className="block text-xs text-gray-400">
                       {parseFloat(m.man_days || 0)} MD · {fmt(m.gross_profit)} est.
                     </span>
                   </td>
@@ -323,7 +321,7 @@ export default function ModuleCompletionGrid({
                           disabled={saving === key || isFuture}
                           title={isFuture ? 'This day has not happened yet.' : undefined}
                           placeholder="—"
-                          className="w-14 text-center border border-gray-300 rounded px-1 py-1 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                          className="w-24 text-center border border-gray-300 rounded px-1 py-2 text-base font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
                         />
                       </td>
                     )
@@ -345,12 +343,7 @@ export default function ModuleCompletionGrid({
                 this one answers "what did we make on Tuesday?". A day can come
                 out negative when a PM restates an earlier reading downward. */}
             <tr className="bg-gray-50/60 border-t-2 border-gray-200">
-              <td className="py-2 px-4 font-bold text-gray-700">
-                Weekly Job Gross Profit Earned
-                <span className="ml-2 font-bold text-green-700 tabular-nums">
-                  {fmt(jobEarnedAt(week[6]) - jobEarnedAt(prevDay(week[0])))}
-                </span>
-              </td>
+              <td className="py-2 px-4 font-bold text-gray-700">Weekly Job Gross Profit Earned</td>
               {week.map(d => {
                 const gained = jobEarnedAt(d) - jobEarnedAt(prevDay(d))
                 return (
@@ -365,19 +358,16 @@ export default function ModuleCompletionGrid({
                   </td>
                 )
               })}
-              <td className="py-2 px-4" />
+              <td className="py-2 px-4 text-center tabular-nums font-bold text-green-700">
+                {fmt(jobEarnedAt(week[6]) - jobEarnedAt(prevDay(week[0])))}
+              </td>
             </tr>
 
             {/* Job total — every module's cumulative reading weighted by its
                 estimated profit. Modules run in sequence and sometimes overlap;
                 this is the line that shows the job as a whole marching to 100%. */}
             <tr className="bg-gray-50 border-t border-gray-200">
-              <td className="py-2 px-4 font-bold text-gray-700">
-                Total Job Gross Profit Earned
-                <span className="ml-2 font-bold text-green-700 tabular-nums">
-                  {fmt(jobEarnedAt(week[6]))}
-                </span>
-              </td>
+              <td className="py-2 px-4 font-bold text-gray-700">Total Job Gross Profit Earned</td>
               {week.map(d => (
                 <td key={d} className="py-2 px-1 text-center">
                   <span className="text-sm font-bold tabular-nums text-green-700">
@@ -385,14 +375,8 @@ export default function ModuleCompletionGrid({
                   </span>
                 </td>
               ))}
-              <td className="py-2 px-4 text-center">
-                <span
-                  className={`text-sm font-bold ${
-                    jobCumAt(week[6]) >= 99.995 ? 'text-green-700' : 'text-gray-400'
-                  }`}
-                >
-                  {jobCumAt(week[6]) >= 99.995 ? 'Yes' : 'No'}
-                </span>
+              <td className="py-2 px-4 text-center tabular-nums font-bold text-green-700">
+                {fmt(jobEarnedAt(week[6]))}
               </td>
             </tr>
           </tbody>

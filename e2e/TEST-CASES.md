@@ -842,3 +842,13 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   `gain()` helper that only fed it.
 - Grid is now: MODULE · seven day columns · COMPLETE. Header and body cell counts verified
   in sync at 9.
+
+## Completion grid — final sizing
+
+- Job-level Yes/No dropped from the total row; both summary rows put their totals in that
+  freed last column instead ($2,366 weekly, $7,455 cumulative). Module rows keep Yes/No.
+  `jobCumAt()` removed — it existed only to decide that job-level Yes/No.
+- Entry boxes 96 × 42px (from 56 × 30) with `text-base font-semibold` figures; module names
+  `text-base font-semibold`, project names `text-sm`, the MD/est. line `text-xs`.
+- Table measured at 1300px inside a 1300px pane after every enlargement — it fills the width
+  exactly without forcing a horizontal scrollbar. Worth re-checking if anything else grows.
