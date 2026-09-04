@@ -881,3 +881,17 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   from jumping when it hides.
 - Verified: all four sections render their content, the picker shows only on Progress, no
   page errors, 336 unit tests still green.
+
+## Tracking tab — frozen header, scrolling sections
+
+- TWO BUGS from the four-section restructure, both visible on the Crew section:
+  1. A stray `)}` rendered as literal text on the page — left behind when the `{true && (`
+     wrapper was removed but its closing brace was not. JSX renders an orphan like that as a
+     text node rather than failing the build, so it survived a clean build.
+  2. The crew panels sat in a SECOND `flex-1` container while the first stayed expanded and
+     nearly empty, leaving ~350px of white space above them.
+- Restructured: the summary bar and the section chooser are now a `flex-shrink-0` header,
+  and all four sections live in one `flex-1 min-h-0 overflow-y-auto` body. Only the section
+  scrolls.
+- Verified: no stray text on screen, 16px between toolbar and content, and the toolbar's y
+  is unchanged (304px) after scrolling the body 400px — genuinely frozen, not just tall.

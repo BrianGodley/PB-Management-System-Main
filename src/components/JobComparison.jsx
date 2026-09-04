@@ -1,11 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
-import {
-  resolveRates,
-  jobProfitAsOf,
-  attributeHoursByModule,
-  weekDates,
-} from '../lib/jobProfit'
+import { resolveRates, jobProfitAsOf, attributeHoursByModule, weekDates } from '../lib/jobProfit'
 import ModuleCompletionGrid, { WeekPicker, weekBounds } from './ModuleCompletionGrid'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -70,7 +65,14 @@ function DeltaBadge({ est, act, currency = false, inverse = false }) {
 // green-400 and red-400 rather than -700 and -600 — or the values go muddy.
 
 // A metric with one value — used where estimated and actual are the same thing.
-function Single({ label, value, currency = false, unknown = false, unknownNote, tone = 'text-white' }) {
+function Single({
+  label,
+  value,
+  currency = false,
+  unknown = false,
+  unknownNote,
+  tone = 'text-white',
+}) {
   return (
     <div className="flex-1 min-w-0 px-3 py-1.5">
       <p className="text-[10px] font-bold text-gray-300 text-center truncate">{label}</p>
@@ -838,8 +840,7 @@ export default function JobComparison({ job }) {
   // working surface; the rest are reference. weekOf lives here rather than in
   // the grid so the picker can share a row with the section toggles and stay
   // put when another section is showing.
-  const jobStart =
-    job?.sold_date || job?.projected_start || job?.actual_start || job?.created_at
+  const jobStart = job?.sold_date || job?.projected_start || job?.actual_start || job?.created_at
   const [section, setSection] = useState('progress')
   const [weekOf, setWeekOf] = useState(new Date().toISOString().slice(0, 10))
   const [workOrders, setWorkOrders] = useState([])
@@ -864,29 +865,34 @@ export default function JobComparison({ job }) {
     setLoading(true)
     const [woRes, siRes, teRes, billRes, invRes, crewRes, settingsRes, projRes, compRes] =
       await Promise.all([
-      supabase.from('work_orders').select('*').eq('job_id', job.id).order('module_type'),
-      supabase.from('schedule_items').select('*').eq('job_id', job.id).order('start_date'),
-      supabase.from('time_entries').select('*').eq('job_id', job.id).order('date').order('time_in'),
-      supabase
-        .from('acct_bills')
-        .select('*')
-        .eq('job_id', job.id)
-        .order('date', { ascending: false }),
-      supabase
-        .from('acct_invoices')
-        .select('*')
-        .eq('job_id', job.id)
-        .order('date', { ascending: false }),
-      supabase.from('crews').select('*').order('label'),
-      supabase.from('company_settings').select('*').maybeSingle(),
-      job.estimate_id
-        ? supabase
-            .from('estimate_projects')
-            .select('id, project_name, material_gp_markup_rate, estimate_modules ( * )')
-            .eq('estimate_id', job.estimate_id)
-        : Promise.resolve({ data: [] }),
-      supabase.from('module_completion').select('*').eq('job_id', job.id),
-    ])
+        supabase.from('work_orders').select('*').eq('job_id', job.id).order('module_type'),
+        supabase.from('schedule_items').select('*').eq('job_id', job.id).order('start_date'),
+        supabase
+          .from('time_entries')
+          .select('*')
+          .eq('job_id', job.id)
+          .order('date')
+          .order('time_in'),
+        supabase
+          .from('acct_bills')
+          .select('*')
+          .eq('job_id', job.id)
+          .order('date', { ascending: false }),
+        supabase
+          .from('acct_invoices')
+          .select('*')
+          .eq('job_id', job.id)
+          .order('date', { ascending: false }),
+        supabase.from('crews').select('*').order('label'),
+        supabase.from('company_settings').select('*').maybeSingle(),
+        job.estimate_id
+          ? supabase
+              .from('estimate_projects')
+              .select('id, project_name, material_gp_markup_rate, estimate_modules ( * )')
+              .eq('estimate_id', job.estimate_id)
+          : Promise.resolve({ data: [] }),
+        supabase.from('module_completion').select('*').eq('job_id', job.id),
+      ])
 
     setWorkOrders(woRes.data || [])
     setScheduleItems(siRes.data || [])
@@ -1005,10 +1011,7 @@ export default function JobComparison({ job }) {
   // — the sale price does not move, so the difference is profit either way.
   const subCostChange = nv(job?.sub_cost_change)
   async function saveSubCostChange(next) {
-    const { error } = await supabase
-      .from('jobs')
-      .update({ sub_cost_change: next })
-      .eq('id', job.id)
+    const { error } = await supabase.from('jobs').update({ sub_cost_change: next }).eq('id', job.id)
     if (!error) {
       job.sub_cost_change = next // the row is owned by the parent list
       fetchAll()
@@ -1017,10 +1020,7 @@ export default function JobComparison({ job }) {
 
   const materialGp = useMemo(
     () =>
-      estModules.reduce(
-        (sum, m) => sum + nv(m.material_cost) * nv(m.material_gp_markup_rate),
-        0
-      ),
+      estModules.reduce((sum, m) => sum + nv(m.material_cost) * nv(m.material_gp_markup_rate), 0),
     [estModules]
   )
   const glpmde = useMemo(() => {
@@ -1066,250 +1066,256 @@ export default function JobComparison({ job }) {
   return (
     <div className="flex flex-col h-full">
       {/* The summary bar is always on; the four sections below it swap. */}
-      <>
-
-          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 mt-4">
-            {/* Summary bar — estimated and actual as separate cards, so a
+      {/* Frozen: the summary bar and the section chooser stay put while the
+          section below them scrolls. */}
+      <div className="flex-shrink-0 space-y-3 mt-4">
+        {/* Summary bar — estimated and actual as separate cards, so a
                 column heading says what the figure IS and the card says which
                 side of the comparison it sits on. */}
-            <div className="flex flex-col lg:flex-row gap-3 items-stretch">
-              <Group
-                title="In House Labor Estimated"
-                grow="lg:flex-[8_1_0%]"
-                accent={{ text: 'text-blue-700', border: 'border-blue-400/70' }}
-              >
-                <Single label="Man Days" value={c.estManDays} />
-                <Single label="Labor Cost" value={c.estLaborCost} currency />
-                <Single
-                  label="Gross Profit"
-                  value={profit ? profit.glpeTotal : 0}
-                  currency
-                  unknown={!profit}
-                  unknownNote={RATE_NOTE}
-                />
-                <Single
-                  label="GLPMD"
-                  value={glpmde || 0}
-                  currency
-                  unknown={glpmde == null}
-                  unknownNote="No estimated man days on this job."
-                />
-              </Group>
+        <div className="flex flex-col lg:flex-row gap-3 items-stretch">
+          <Group
+            title="In House Labor Estimated"
+            grow="lg:flex-[8_1_0%]"
+            accent={{ text: 'text-blue-700', border: 'border-blue-400/70' }}
+          >
+            <Single label="Man Days" value={c.estManDays} />
+            <Single label="Labor Cost" value={c.estLaborCost} currency />
+            <Single
+              label="Gross Profit"
+              value={profit ? profit.glpeTotal : 0}
+              currency
+              unknown={!profit}
+              unknownNote={RATE_NOTE}
+            />
+            <Single
+              label="GLPMD"
+              value={glpmde || 0}
+              currency
+              unknown={glpmde == null}
+              unknownNote="No estimated man days on this job."
+            />
+          </Group>
 
-              <Group
-                title="In House Labor Actual"
-                grow="lg:flex-[8_1_0%]"
-                accent={{ text: 'text-blue-700', border: 'border-blue-400/70' }}
-              >
-                {/* Each actual is coloured against what is DUE at the job's
+          <Group
+            title="In House Labor Actual"
+            grow="lg:flex-[8_1_0%]"
+            accent={{ text: 'text-blue-700', border: 'border-blue-400/70' }}
+          >
+            {/* Each actual is coloured against what is DUE at the job's
                     current completion, not against the whole estimate — a job
                     half done has spent half its budget by design. */}
-                <Single
-                  label="Man Days"
-                  value={profit ? profit.actualManDays : c.actManDays}
-                  tone={toneFor(
-                    profit ? profit.actualManDays : c.actManDays,
-                    profit ? c.estManDays * profit.jobCompletion : null,
-                    true
-                  )}
-                />
-                <Single
-                  label="Labor Cost"
-                  value={profit ? profit.rlc : c.actLaborCost}
-                  currency
-                  unknown={!profit}
-                  unknownNote={RATE_NOTE}
-                  tone={toneFor(profit?.rlc, profit?.elcToDate, true)}
-                />
-                <Single
-                  label="Gross Profit"
-                  value={profit ? profit.glpa : 0}
-                  currency
-                  unknown={!profit}
-                  unknownNote={RATE_NOTE}
-                  tone={toneFor(profit?.glpa, profit?.earned, false)}
-                />
-                <Single
-                  label="GLPMD"
-                  value={profit?.glpmda || 0}
-                  currency
-                  unknown={!profit || profit.glpmda == null}
-                  unknownNote="No hours clocked yet, so there is no produced rate to show."
-                  tone={toneFor(profit?.glpmda, glpmde, false)}
-                />
-              </Group>
+            <Single
+              label="Man Days"
+              value={profit ? profit.actualManDays : c.actManDays}
+              tone={toneFor(
+                profit ? profit.actualManDays : c.actManDays,
+                profit ? c.estManDays * profit.jobCompletion : null,
+                true
+              )}
+            />
+            <Single
+              label="Labor Cost"
+              value={profit ? profit.rlc : c.actLaborCost}
+              currency
+              unknown={!profit}
+              unknownNote={RATE_NOTE}
+              tone={toneFor(profit?.rlc, profit?.elcToDate, true)}
+            />
+            <Single
+              label="Gross Profit"
+              value={profit ? profit.glpa : 0}
+              currency
+              unknown={!profit}
+              unknownNote={RATE_NOTE}
+              tone={toneFor(profit?.glpa, profit?.earned, false)}
+            />
+            <Single
+              label="GLPMD"
+              value={profit?.glpmda || 0}
+              currency
+              unknown={!profit || profit.glpmda == null}
+              unknownNote="No hours clocked yet, so there is no produced rate to show."
+              tone={toneFor(profit?.glpmda, glpmde, false)}
+            />
+          </Group>
 
-              <Group
-                title="Subcontractors"
-                grow="lg:flex-[5_1_0%]"
-                accent={{ text: 'text-orange-600', border: 'border-orange-400/70' }}
-              >
-                <EditableSingle
-                  label="Cost Change +/-"
-                  value={subCostChange}
-                  onSave={saveSubCostChange}
-                  tone={subCostChange > 0 ? 'text-red-400' : subCostChange < 0 ? 'text-green-400' : 'text-gray-500'}
-                  hint="The sub revised their quote outside of a change order. Positive costs more and reduces gross profit."
-                />
-                <Single
-                  label="Gross Profit"
-                  value={(profit ? profit.subTotal : 0) - subCostChange}
-                  currency
-                  tone="text-green-400"
-                />
-              </Group>
+          <Group
+            title="Subcontractors"
+            grow="lg:flex-[5_1_0%]"
+            accent={{ text: 'text-orange-600', border: 'border-orange-400/70' }}
+          >
+            <EditableSingle
+              label="Cost Change +/-"
+              value={subCostChange}
+              onSave={saveSubCostChange}
+              tone={
+                subCostChange > 0
+                  ? 'text-red-400'
+                  : subCostChange < 0
+                    ? 'text-green-400'
+                    : 'text-gray-500'
+              }
+              hint="The sub revised their quote outside of a change order. Positive costs more and reduces gross profit."
+            />
+            <Single
+              label="Gross Profit"
+              value={(profit ? profit.subTotal : 0) - subCostChange}
+              currency
+              tone="text-green-400"
+            />
+          </Group>
 
-              <Group
-                title="Materials"
-                grow="lg:flex-[7_1_0%]"
-                accent={{ text: 'text-amber-600', border: 'border-amber-400/70' }}
-              >
-                <Single label="Estimated Cost" value={c.estMaterialCost} currency />
-                <Single
-                  label="Actual Cost"
-                  value={c.actMaterialCost}
-                  currency
-                  unknown={bills.length === 0}
-                  unknownNote="No vendor bills or card charges are linked to this job yet."
-                />
-                <Single
-                  label="Gross Profit"
-                  value={materialGp}
-                  currency
-                  tone={materialGp > 0 ? 'text-green-400' : 'text-gray-500'}
-                />
-              </Group>
-            </div>
+          <Group
+            title="Materials"
+            grow="lg:flex-[7_1_0%]"
+            accent={{ text: 'text-amber-600', border: 'border-amber-400/70' }}
+          >
+            <Single label="Estimated Cost" value={c.estMaterialCost} currency />
+            <Single
+              label="Actual Cost"
+              value={c.actMaterialCost}
+              currency
+              unknown={bills.length === 0}
+              unknownNote="No vendor bills or card charges are linked to this job yet."
+            />
+            <Single
+              label="Gross Profit"
+              value={materialGp}
+              currency
+              tone={materialGp > 0 ? 'text-green-400' : 'text-gray-500'}
+            />
+          </Group>
+        </div>
 
-          {/* One row: the week chooser where it is useful, the section chooser
+        {/* One row: the week chooser where it is useful, the section chooser
               always. The picker only governs Progress, so it is hidden for the
               reference sections rather than sitting there doing nothing. */}
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="min-h-[34px] flex items-center">
-              {section === 'progress' ? (
-                <WeekPicker
-                  weekOf={weekOf}
-                  setWeekOf={setWeekOf}
-                  jobStartDate={jobStart}
-                  completions={completions}
-                />
-              ) : null}
-            </div>
-            <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-              {[
-                { key: 'progress', label: '📈 Progress' },
-                { key: 'crew', label: '👷 Crew' },
-                { key: 'payroll', label: '⏱ Payroll' },
-                { key: 'breakdown', label: '📋 Breakdown' },
-              ].map(t => (
-                <button
-                  key={t.key}
-                  onClick={() => setSection(t.key)}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    section === t.key
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="min-h-[34px] flex items-center">
+            {section === 'progress' ? (
+              <WeekPicker
+                weekOf={weekOf}
+                setWeekOf={setWeekOf}
+                jobStartDate={jobStart}
+                completions={completions}
+              />
+            ) : null}
           </div>
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+            {[
+              { key: 'progress', label: '📈 Progress' },
+              { key: 'crew', label: '👷 Crew' },
+              { key: 'payroll', label: '⏱ Payroll' },
+              { key: 'breakdown', label: '📋 Breakdown' },
+            ].map(t => (
+              <button
+                key={t.key}
+                onClick={() => setSection(t.key)}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  section === t.key
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
-          {/* ── PROGRESS — the PM's daily completion entry, the one human input
+      {/* The scrolling half — one section at a time. */}
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-4 mt-3 pb-4">
+        {/* ── PROGRESS — the PM's daily completion entry, the one human input
               the profit figures above depend on. The timeclock says what was
               spent; only a person can say what was finished. */}
-          {section === 'progress' && (
-            <ModuleCompletionGrid
-              jobId={job.id}
-              modules={estModules}
-              completions={completions}
-              rows={profit?.rows || []}
-              onChange={setCompletions}
-              weekOf={weekOf}
-              jobStartDate={jobStart}
-            />
-          )}
+        {section === 'progress' && (
+          <ModuleCompletionGrid
+            jobId={job.id}
+            modules={estModules}
+            completions={completions}
+            rows={profit?.rows || []}
+            onChange={setCompletions}
+            weekOf={weekOf}
+            jobStartDate={jobStart}
+          />
+        )}
 
-          {/* ── PAYROLL ── */}
-          {section === 'payroll' && c.payrollHours > 0 && (
-            <div className="flex flex-wrap gap-3 px-4 py-2.5 bg-blue-50 rounded-xl border border-blue-100 text-sm">
-              <span className="text-blue-700 font-semibold">⏱ Payroll:</span>
-              <span className="text-gray-700">{c.payrollHours.toFixed(1)}h clocked</span>
-              <span className="text-gray-400">·</span>
-              <span className="text-gray-700">{(c.scheduledManDays * 8).toFixed(0)}h standard</span>
-              {c.overtimeHours > 0.1 && (
-                <>
-                  <span className="text-gray-400">·</span>
-                  <span className="text-red-600 font-semibold">
-                    +{c.overtimeHours.toFixed(1)}h overtime ({c.overtimeManDays.toFixed(2)} MD
-                    added)
-                  </span>
-                </>
-              )}
-            </div>
-          )}
-
-          {section === 'payroll' && (
-              <PayrollPanel timeEntries={timeEntries} scheduledManDays={c.scheduledManDays} />
+        {/* ── PAYROLL ── */}
+        {section === 'payroll' && c.payrollHours > 0 && (
+          <div className="flex flex-wrap gap-3 px-4 py-2.5 bg-blue-50 rounded-xl border border-blue-100 text-sm">
+            <span className="text-blue-700 font-semibold">⏱ Payroll:</span>
+            <span className="text-gray-700">{c.payrollHours.toFixed(1)}h clocked</span>
+            <span className="text-gray-400">·</span>
+            <span className="text-gray-700">{(c.scheduledManDays * 8).toFixed(0)}h standard</span>
+            {c.overtimeHours > 0.1 && (
+              <>
+                <span className="text-gray-400">·</span>
+                <span className="text-red-600 font-semibold">
+                  +{c.overtimeHours.toFixed(1)}h overtime ({c.overtimeManDays.toFixed(2)} MD added)
+                </span>
+              </>
             )}
+          </div>
+        )}
 
-            {/* ── BREAKDOWN — the module table and the accounting detail ── */}
-            {section === 'breakdown' && workOrders.length > 0 && (
-              <ModuleTable
-                workOrders={workOrders}
+        {section === 'payroll' && (
+          <PayrollPanel timeEntries={timeEntries} scheduledManDays={c.scheduledManDays} />
+        )}
+
+        {/* ── BREAKDOWN — the module table and the accounting detail ── */}
+        {section === 'breakdown' && workOrders.length > 0 && (
+          <ModuleTable
+            workOrders={workOrders}
+            scheduleItems={scheduleItems}
+            crewMap={crewMap}
+            laborRate={laborRate}
+          />
+        )}
+        {section === 'breakdown' && <AccountingPanel bills={bills} invoices={invoices} />}
+
+        {/* ── CREW ── */}
+        {section === 'crew' && (
+          <div className="space-y-3">
+            {Object.entries(crewGroups)
+              .filter(([key]) => key !== '__unassigned__')
+              .map(([crewId, wos]) => {
+                const crew = crewMap[crewId]
+                return (
+                  <CrewSection
+                    key={crewId}
+                    crewLabel={crew?.label || crewId.slice(0, 8)}
+                    crewColor={crew?.color}
+                    workOrders={wos}
+                    scheduleItems={scheduleItems}
+                    crewMap={crewMap}
+                    laborRate={laborRate}
+                  />
+                )
+              })}
+
+            {crewGroups['__unassigned__']?.length > 0 && (
+              <CrewSection
+                key="__unassigned__"
+                crewLabel="Unassigned"
+                workOrders={crewGroups['__unassigned__']}
                 scheduleItems={scheduleItems}
                 crewMap={crewMap}
                 laborRate={laborRate}
+                isUnassigned
               />
             )}
-            {section === 'breakdown' && <AccountingPanel bills={bills} invoices={invoices} />}
+
+            {Object.keys(crewGroups).length === 0 && (
+              <div className="text-center py-12 text-gray-400">
+                <p className="text-3xl mb-2">👷</p>
+                <p className="text-sm">No work orders with crew assignments yet.</p>
+                <p className="text-xs mt-1">Assign crews via the Schedule tab.</p>
+              </div>
+            )}
           </div>
-        </>
-      )}
-
-      {/* ── CREW ── */}
-      {section === 'crew' && (
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-3 mt-4">
-          {Object.entries(crewGroups)
-            .filter(([key]) => key !== '__unassigned__')
-            .map(([crewId, wos]) => {
-              const crew = crewMap[crewId]
-              return (
-                <CrewSection
-                  key={crewId}
-                  crewLabel={crew?.label || crewId.slice(0, 8)}
-                  crewColor={crew?.color}
-                  workOrders={wos}
-                  scheduleItems={scheduleItems}
-                  crewMap={crewMap}
-                  laborRate={laborRate}
-                />
-              )
-            })}
-
-          {crewGroups['__unassigned__']?.length > 0 && (
-            <CrewSection
-              key="__unassigned__"
-              crewLabel="Unassigned"
-              workOrders={crewGroups['__unassigned__']}
-              scheduleItems={scheduleItems}
-              crewMap={crewMap}
-              laborRate={laborRate}
-              isUnassigned
-            />
-          )}
-
-          {Object.keys(crewGroups).length === 0 && (
-            <div className="text-center py-12 text-gray-400">
-              <p className="text-3xl mb-2">👷</p>
-              <p className="text-sm">No work orders with crew assignments yet.</p>
-              <p className="text-xs mt-1">Assign crews via the Schedule tab.</p>
-            </div>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
