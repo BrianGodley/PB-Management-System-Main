@@ -1027,3 +1027,22 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   fixed; one component makes that impossible.
 - Progress grid: completion percentage up to 18px, module names pinned left (measured: all
   six start at the same x).
+
+## Crew assignment scenarios
+
+- `scripts/seed-scenario-jobs.py` seeds two jobs with the same five modules — Concrete,
+  Walls and Outdoor Kitchen on a Masonry crew, Irrigation and Planting on a Landscape crew.
+  Crews are chosen by skill level from `crews.skills` (Crew C is the only Masonry 4).
+  - **Test Scenario1 — Sequential**: the masonry crew works its three modules one after
+    another. Every hour belongs to one module; 32.0 est → 33.0 act MD, 100% attributed.
+  - **Test Scenario2 — Overlapping**: the masonry crew is booked on all three at once. The
+    engine splits each shared day evenly and flags every affected row `apportioned`.
+    Walls draws 5.0 MD against the others' 2.0 because it runs a day longer and that day is
+    unshared. Module rows sum exactly to the job's 21.0 MD — nothing double-counted.
+- SEED FAULT FOUND AND FIXED: the first version wrote one timeclock entry PER MODULE, so on
+  overlapping days a crew "worked" three shifts and the job showed phantom overtime
+  ($9,875 against the sequential job's $8,356 for identical work). Shifts are now collected
+  per CREW per day — a person clocks one day however many modules they touch.
+- The standing limitation this documents: per-module labour cost is MEASURED only when a
+  crew works one module at a time. Overlapping work is apportioned, and only a clock-in that
+  names its module could recover the truth.
