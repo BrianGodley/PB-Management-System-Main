@@ -69,67 +69,19 @@ function DeltaBadge({ est, act, currency = false, inverse = false }) {
 // On black, the tones shift a step lighter than they would on white —
 // green-400 and red-400 rather than -700 and -600 — or the values go muddy.
 
-// A metric with an estimated and an actual side.
-function Pair({
-  estLabel,
-  actLabel,
-  est,
-  act,
-  currency = false,
-  inverse = false,
-  unknown = false,
-  unknownNote,
-  expected = null,
-}) {
-  const display = v => (currency ? fmt(v) : fmtD(v))
-  // Colour against what SHOULD have been used by this point, not against the
-  // full estimate. A job 48% complete has spent 48% of its budget by design;
-  // judging it against 100% paints every open job red for no reason.
-  const against = expected != null ? expected : est
-  const delta = unknown ? null : act - against
-  // `inverse` marks a metric where spending LESS is the good outcome.
-  const bad = inverse ? delta > 0 : delta < 0
-  const tone =
-    delta == null || Math.abs(delta) < 0.005
-      ? 'text-white'
-      : bad
-        ? 'text-red-400'
-        : 'text-green-400'
-  return (
-    <div className="flex-1 min-w-0 px-2 xl:px-5 2xl:px-9 py-1.5">
-      {/* The card border does the grouping now, so the pair can sit wider than
-          it did in the old single bar — but not edge to edge, which read as two
-          separate figures again. */}
-      <div className="flex items-start justify-between gap-3 min-w-0">
-        {/* Each half centres on itself, so the figure sits under the middle of
-            its own label rather than flush to the group's outer edges. */}
-        <div className="min-w-0 text-center">
-          <p className="text-[10px] font-bold text-gray-300 truncate">{estLabel}</p>
-          <p className="text-sm font-bold text-white tabular-nums truncate">{display(est)}</p>
-        </div>
-        <div className="min-w-0 text-center">
-          <p className="text-[10px] font-bold text-gray-300 truncate">{actLabel}</p>
-          {unknown ? (
-            <p className="text-sm font-bold text-gray-500 truncate" title={unknownNote}>
-              not yet known
-            </p>
-          ) : (
-            <p className={`text-sm font-bold tabular-nums truncate ${tone}`}>{display(act)}</p>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // A metric with one value — used where estimated and actual are the same thing.
 function Single({ label, value, currency = false, unknown = false, unknownNote, tone = 'text-white' }) {
   return (
     <div className="flex-1 min-w-0 px-3 py-1.5">
       <p className="text-[10px] font-bold text-gray-300 text-center truncate">{label}</p>
       {unknown ? (
-        <p className="text-sm font-bold text-gray-500 text-center truncate" title={unknownNote}>
-          not yet known
+        <p
+          className="text-xs font-bold text-gray-500 text-center leading-tight mt-0.5"
+          title={unknownNote}
+        >
+          not yet
+          <br />
+          known
         </p>
       ) : (
         <p className={`text-sm font-bold tabular-nums text-center truncate ${tone}`}>
@@ -191,7 +143,20 @@ function EditableSingle({ label, value, onSave, tone = 'text-white', hint }) {
   )
 }
 
-function Group({ title, accent, grow, children, cards = false }) {
+const RATE_NOTE = 'Set the crew rate and overtime multiplier in HR → Labor Rates.'
+
+// Colour an actual against what is DUE at this completion. `inverse` marks a
+// figure where spending LESS is the good outcome (man days, cost); profit and
+// the produced rate are the other way round.
+function toneFor(actual, expected, inverse) {
+  if (actual == null || expected == null) return 'text-white'
+  const delta = actual - expected
+  if (Math.abs(delta) < 0.005) return 'text-white'
+  const bad = inverse ? delta > 0 : delta < 0
+  return bad ? 'text-red-400' : 'text-green-400'
+}
+
+function Group({ title, accent, grow, children }) {
   return (
     <div className={`min-w-0 flex flex-col ${grow}`}>
       <p
@@ -199,26 +164,11 @@ function Group({ title, accent, grow, children, cards = false }) {
       >
         {title}
       </p>
-      {cards ? (
-        <div className="flex-1 flex flex-col sm:flex-row gap-2 items-stretch">{children}</div>
-      ) : (
-        <div
-          className={`flex-1 flex items-stretch divide-x divide-white/10 rounded-lg border bg-gray-900 py-1 px-1 ${accent.border}`}
-        >
-          {children}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// One tile inside a card-mode group.
-function Card({ accent, children }) {
-  return (
-    <div
-      className={`flex-1 min-w-0 flex items-center justify-center rounded-lg border bg-gray-900 py-2 ${accent}`}
-    >
-      {children}
+      <div
+        className={`flex-1 flex items-stretch divide-x divide-white/10 rounded-lg border bg-gray-900 py-1 px-1 ${accent.border}`}
+      >
+        {children}
+      </div>
     </div>
   )
 }
@@ -883,8 +833,8 @@ function CrewSection({ crewLabel, workOrders, scheduleItems, crewMap, laborRate,
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-export default function JobComparison({ job }) {
-  const [tab, setTab] = useState('overall')
+export default function JobComparison({ job, view = 'overall' }) {
+  const tab = view
   const [workOrders, setWorkOrders] = useState([])
   const [scheduleItems, setScheduleItems] = useState([])
   const [timeEntries, setTimeEntries] = useState([])
@@ -1108,98 +1058,85 @@ export default function JobComparison({ job }) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header — frozen */}
-      <div className="flex items-center justify-end flex-wrap gap-2 flex-shrink-0 mt-3">
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-          {[
-            { key: 'overall', label: '📊 Overall' },
-            { key: 'by-crew', label: '👷 By Crew' },
-          ].map(t => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                tab === t.key
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* ── OVERALL TAB ── */}
       {tab === 'overall' && (
         <>
           {/* KPI summary cards + payroll bar scroll together with the detail
               below (no longer frozen). */}
           <div className="flex-1 min-h-0 overflow-y-auto space-y-4 mt-4">
-            {/* Summary bar — three groups, mirroring the estimator */}
-            <div className="flex flex-col gap-3">
+            {/* Summary bar — estimated and actual as separate cards, so a
+                column heading says what the figure IS and the card says which
+                side of the comparison it sits on. */}
+            <div className="flex flex-col lg:flex-row gap-3 items-stretch">
               <Group
-                title="In House Labor"
-                grow="w-full"
-                cards
+                title="In House Labor Estimated"
+                grow="lg:flex-[8_1_0%]"
                 accent={{ text: 'text-blue-700', border: 'border-blue-400/70' }}
               >
-                <Card accent="border-blue-400/70">
-                  <Pair
-                    estLabel="Estimated Man Days"
-                    actLabel="Actual Man Days"
-                    est={c.estManDays}
-                    act={profit ? profit.actualManDays : c.actManDays}
-                    inverse
-                    expected={profit ? c.estManDays * profit.jobCompletion : null}
-                  />
-                </Card>
-                <Card accent="border-blue-400/70">
-                  <Pair
-                    estLabel="Estimated Labor Cost"
-                    actLabel="Actual Labor Cost"
-                    est={c.estLaborCost}
-                    act={profit ? profit.rlc : c.actLaborCost}
-                    currency
-                    inverse
-                    unknown={!profit}
-                    unknownNote="Set the crew rate and overtime multiplier in HR → Labor Rates."
-                    expected={profit ? profit.elcToDate : null}
-                  />
-                </Card>
-                <Card accent="border-blue-400/70">
-                  <Pair
-                    estLabel="Estimated Gross Profit"
-                    actLabel="Actual Gross Profit"
-                    est={profit ? profit.glpeTotal : 0}
-                    act={profit ? profit.glpa : 0}
-                    currency
-                    unknown={!profit}
-                    unknownNote="Set the crew rate and overtime multiplier in HR → Labor Rates."
-                    expected={profit ? profit.earned : null}
-                  />
-                </Card>
-                {/* The rate the job is producing at, against the rate it was
-                    sold at — the one figure comparable across jobs of any size.
-                    Higher is better here, so no `inverse`. */}
-                <Card accent="border-blue-400/70">
-                  <Pair
-                    estLabel="Estimated GLPMD"
-                    actLabel="Actual GLPMD"
-                    est={glpmde || 0}
-                    act={profit?.glpmda || 0}
-                    currency
-                    unknown={!profit || profit.glpmda == null}
-                    unknownNote="No hours clocked yet, so there is no produced rate to show."
-                    expected={glpmde}
-                  />
-                </Card>
+                <Single label="Man Days" value={c.estManDays} />
+                <Single label="Labor Cost" value={c.estLaborCost} currency />
+                <Single
+                  label="Gross Profit"
+                  value={profit ? profit.glpeTotal : 0}
+                  currency
+                  unknown={!profit}
+                  unknownNote={RATE_NOTE}
+                />
+                <Single
+                  label="GLPMD"
+                  value={glpmde || 0}
+                  currency
+                  unknown={glpmde == null}
+                  unknownNote="No estimated man days on this job."
+                />
               </Group>
 
-              <div className="flex flex-col lg:flex-row gap-3 items-stretch">
+              <Group
+                title="In House Labor Actual"
+                grow="lg:flex-[8_1_0%]"
+                accent={{ text: 'text-blue-700', border: 'border-blue-400/70' }}
+              >
+                {/* Each actual is coloured against what is DUE at the job's
+                    current completion, not against the whole estimate — a job
+                    half done has spent half its budget by design. */}
+                <Single
+                  label="Man Days"
+                  value={profit ? profit.actualManDays : c.actManDays}
+                  tone={toneFor(
+                    profit ? profit.actualManDays : c.actManDays,
+                    profit ? c.estManDays * profit.jobCompletion : null,
+                    true
+                  )}
+                />
+                <Single
+                  label="Labor Cost"
+                  value={profit ? profit.rlc : c.actLaborCost}
+                  currency
+                  unknown={!profit}
+                  unknownNote={RATE_NOTE}
+                  tone={toneFor(profit?.rlc, profit?.elcToDate, true)}
+                />
+                <Single
+                  label="Gross Profit"
+                  value={profit ? profit.glpa : 0}
+                  currency
+                  unknown={!profit}
+                  unknownNote={RATE_NOTE}
+                  tone={toneFor(profit?.glpa, profit?.earned, false)}
+                />
+                <Single
+                  label="GLPMD"
+                  value={profit?.glpmda || 0}
+                  currency
+                  unknown={!profit || profit.glpmda == null}
+                  unknownNote="No hours clocked yet, so there is no produced rate to show."
+                  tone={toneFor(profit?.glpmda, glpmde, false)}
+                />
+              </Group>
+
               <Group
                 title="Subcontractors"
-                grow="lg:flex-[3_1_0%]"
+                grow="lg:flex-[5_1_0%]"
                 accent={{ text: 'text-orange-600', border: 'border-orange-400/70' }}
               >
                 <EditableSingle
@@ -1219,7 +1156,7 @@ export default function JobComparison({ job }) {
 
               <Group
                 title="Materials"
-                grow="lg:flex-[4_1_0%]"
+                grow="lg:flex-[7_1_0%]"
                 accent={{ text: 'text-amber-600', border: 'border-amber-400/70' }}
               >
                 <Single label="Estimated Cost" value={c.estMaterialCost} currency />
@@ -1237,7 +1174,6 @@ export default function JobComparison({ job }) {
                   tone={materialGp > 0 ? 'text-green-400' : 'text-gray-500'}
                 />
               </Group>
-              </div>
             </div>
 
           {/* The PM's daily completion entry — the one human input the profit

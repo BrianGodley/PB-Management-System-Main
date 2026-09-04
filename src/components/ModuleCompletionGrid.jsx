@@ -303,8 +303,14 @@ export default function ModuleCompletionGrid({
                       </td>
                     )
                   })}
-                  <td className="py-2 px-4 text-right tabular-nums text-gray-700">
-                    {row ? `${Math.round(row.completionPct * 100)}%` : '—'}
+                  <td className="py-2 px-4 text-right">
+                    <span
+                      className={`text-sm font-bold ${
+                        row && row.completionPct >= 1 ? 'text-green-700' : 'text-gray-400'
+                      }`}
+                    >
+                      {row && row.completionPct >= 1 ? 'Yes' : 'No'}
+                    </span>
                   </td>
                   <td className="py-2 px-4 text-right tabular-nums font-semibold text-green-700">
                     {row ? fmt(row.earnedLaborGp + (row.earnedSubGp || 0)) : '—'}
@@ -340,8 +346,14 @@ export default function ModuleCompletionGrid({
                   </td>
                 )
               })}
-              <td className="py-2 px-4 text-right tabular-nums font-bold text-gray-800">
-                {Math.round(jobCumAt(week[6]))}%
+              <td className="py-2 px-4 text-right">
+                <span
+                  className={`text-sm font-bold ${
+                    jobCumAt(week[6]) >= 99.995 ? 'text-green-700' : 'text-gray-400'
+                  }`}
+                >
+                  {jobCumAt(week[6]) >= 99.995 ? 'Yes' : 'No'}
+                </span>
               </td>
               <td className="py-2 px-4 text-right tabular-nums font-bold text-green-700">
                 {fmt(

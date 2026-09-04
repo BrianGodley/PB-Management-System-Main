@@ -1323,6 +1323,9 @@ export default function JobsList() {
   ]
   // Active tab's label without the leading emoji — used in the breadcrumb.
   const tabName = (TABS.find(t => t.key === tab)?.label || '').replace(/^\S+\s+/, '')
+  // Lifted out of JobComparison so the Overall / By Crew choice can sit on the
+  // breadcrumb row rather than in a strip of its own above the cards.
+  const [trackingView, setTrackingView] = useState('overall')
 
   return (
     <div className="flex flex-col h-full">
@@ -1406,6 +1409,26 @@ export default function JobsList() {
                 : selectedJobObj?.name || selectedJobObj?.client_name || '—'}
             </span>
           </>
+        )}
+        {tab === 'tracking' && selectedJobObj && (
+          <div className="ml-auto flex gap-1 bg-gray-100 rounded-lg p-1 flex-shrink-0">
+            {[
+              { key: 'overall', label: '📊 Overall' },
+              { key: 'by-crew', label: '👷 By Crew' },
+            ].map(t => (
+              <button
+                key={t.key}
+                onClick={() => setTrackingView(t.key)}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  trackingView === t.key
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
@@ -1987,7 +2010,7 @@ export default function JobsList() {
 
             {tab === 'tracking' &&
               (selectedJobObj ? (
-                <JobComparison job={selectedJobObj} />
+                <JobComparison job={selectedJobObj} view={trackingView} />
               ) : (
                 <AllJobsTracking
                   jobs={jobs}

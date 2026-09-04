@@ -739,3 +739,19 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   columns rather than a caption crowding the picker.
 - Both states verified in the browser: "Current week" at 8/30–9/5 with Next disabled, and
   "Job sold this week" at 8/9–8/15 with Prev disabled.
+
+## Summary bar — Estimated and Actual as separate cards
+
+- Four groups on one row: **In House Labor Estimated · In House Labor Actual · Subcontractors
+  · Materials**. Each labour card holds Man Days, Labor Cost, Gross Profit, GLPMD — the word
+  Estimated/Actual moved from every value label to the card title, so a column says what the
+  figure IS and the card says which side it is on.
+- `Pair` and `Card` deleted; every cell is a `Single` now. `toneFor(actual, expected,
+  inverse)` carries the completion-adjusted colouring that Pair used to compute internally.
+- Widths follow column counts: 8 / 8 / 5 / 7.
+- "not yet known" was the one string still clipping at these widths; it wraps to two lines at
+  `text-xs` rather than truncating. Verified 0 of 25 texts clipped.
+- COMPLETE column in the grid reads **Yes** (green) at 100%, **No** (grey) otherwise, on both
+  module rows and the job total.
+- The Overall / By Crew toggle lifted from `JobComparison` into `JobsList`, sharing the
+  breadcrumb row with "Tracking / <job>". `JobComparison` takes `view` as a prop.
