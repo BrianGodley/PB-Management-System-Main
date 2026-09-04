@@ -57,17 +57,62 @@ async function fetchIn(table, column, ids, select) {
   return out
 }
 
-export default function AllJobsTracking({ jobs = [], statusFilter = 'open', onSelectJob }) {
+const NO_STAGE = '__none__'
+
+export default function AllJobsTracking({
+  jobs = [],
+  stages = [],
+  statusFilter = 'open',
+  onSelectJob,
+}) {
   const [settings, setSettings] = useState(null)
   const [modulesByJob, setModulesByJob] = useState(new Map())
   const [compByJob, setCompByJob] = useState(new Map())
   const [timeByJob, setTimeByJob] = useState(new Map())
   const [loading, setLoading] = useState(true)
+  // Stages the user has switched OFF. Empty means everything is included, so a
+  // stage added to the pipeline later shows up without anyone re-picking it.
+  const [excludedStages, setExcludedStages] = useState(() => new Set())
 
   const visible = useMemo(
     () => jobs.filter(j => (statusFilter === 'closed' ? !isJobOpen(j) : isJobOpen(j))),
     [jobs, statusFilter]
   )
+
+  // Chips are counted off the status-filtered set, not the stage-filtered one,
+  // so the numbers hold steady while stages are toggled on and off.
+  const stageCounts = useMemo(() => {
+    const m = new Map()
+    for (const j of visible) {
+      const k = j.stage_id || NO_STAGE
+      m.set(k, (m.get(k) || 0) + 1)
+    }
+    return m
+  }, [visible])
+
+  const stageChips = useMemo(() => {
+    const list = stages
+      .filter(st => stageCounts.has(st.id))
+      .map(st => ({ id: st.id, name: st.name, count: stageCounts.get(st.id) }))
+    if (stageCounts.has(NO_STAGE)) {
+      list.push({ id: NO_STAGE, name: 'Unassigned', count: stageCounts.get(NO_STAGE) })
+    }
+    return list
+  }, [stages, stageCounts])
+
+  const inStage = useMemo(
+    () => visible.filter(j => !excludedStages.has(j.stage_id || NO_STAGE)),
+    [visible, excludedStages]
+  )
+
+  function toggleStage(id) {
+    setExcludedStages(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -138,7 +183,7 @@ export default function AllJobsTracking({ jobs = [], statusFilter = 'open', onSe
   const rates = useMemo(() => resolveRates(settings), [settings])
 
   const rows = useMemo(() => {
-    return visible
+    return inStage
       .map(j => {
         const modules = modulesByJob.get(j.id) || []
         const completions = compByJob.get(j.id) || []
@@ -174,7 +219,7 @@ export default function AllJobsTracking({ jobs = [], statusFilter = 'open', onSe
         }
       })
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [visible, modulesByJob, compByJob, timeByJob, rates])
+  }, [inStage, modulesByJob, compByJob, timeByJob, rates])
 
   const trackedRows = rows.filter(r => r.isTracked)
   const totals = trackedRows.reduce(
@@ -195,8 +240,11 @@ export default function AllJobsTracking({ jobs = [], statusFilter = 'open', onSe
       ? trackedRows.reduce((s, r) => s + r.pctComplete * r.estMD, 0) / totals.estMD
       : 0
 
-  const th = 'px-3 py-2.5 text-center text-xs font-bold text-gray-600 tracking-wide'
+  const th = 'px-3 py-2.5 text-center text-sm font-bold text-gray-900 tracking-wide'
   const td = 'px-3 py-2.5 text-base text-center text-gray-700'
+  // The totals bar is the line people read first, so it sits a size above the
+  // rows it sums.
+  const tf = 'px-3 py-3 text-lg text-center text-gray-800'
   // Spending less is the good outcome for days and cost; more is better for profit.
   const tone = (act, est, inverse) => {
     if (!est) return 'text-gray-400'
@@ -221,10 +269,51 @@ export default function AllJobsTracking({ jobs = [], statusFilter = 'open', onSe
         </div>
       )}
 
+      {stageChips.length > 1 && (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-bold text-gray-500 mr-1">Stage</span>
+          {stageChips.map(c => {
+            const on = !excludedStages.has(c.id)
+            return (
+              <button
+                key={c.id}
+                onClick={() => toggleStage(c.id)}
+                className={`rounded-full border px-3 py-1 text-sm font-semibold transition-colors ${
+                  on
+                    ? 'border-green-600 bg-green-50 text-green-800'
+                    : 'border-gray-200 bg-white text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                {c.name}
+                <span className={`ml-1.5 text-xs ${on ? 'text-green-600' : 'text-gray-300'}`}>
+                  {c.count}
+                </span>
+              </button>
+            )
+          })}
+          <button
+            onClick={() => setExcludedStages(new Set())}
+            className="ml-1 text-xs font-semibold text-gray-500 underline hover:text-gray-700"
+          >
+            All
+          </button>
+          <button
+            onClick={() => setExcludedStages(new Set(stageChips.map(c => c.id)))}
+            className="text-xs font-semibold text-gray-500 underline hover:text-gray-700"
+          >
+            None
+          </button>
+        </div>
+      )}
+
       {rows.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-400">
           <p className="mb-2 text-4xl">📊</p>
-          <p className="text-sm">No {statusFilter === 'closed' ? 'closed' : 'open'} jobs.</p>
+          <p className="text-sm">
+            {visible.length
+              ? 'No jobs in the selected stages.'
+              : `No ${statusFilter === 'closed' ? 'closed' : 'open'} jobs.`}
+          </p>
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-gray-200 bg-white">
@@ -296,32 +385,32 @@ export default function AllJobsTracking({ jobs = [], statusFilter = 'open', onSe
             </tbody>
             <tfoot className="sticky bottom-0 bg-gray-50 border-t-2 border-gray-200 font-semibold">
               <tr>
-                <td className={`${td} text-left font-bold text-gray-800`}>
+                <td className={`${tf} text-left font-bold text-gray-900`}>
                   {trackedRows.length} tracked
-                  <span className="block text-xs font-normal text-gray-400">
+                  <span className="block text-sm font-normal text-gray-500">
                     of {rows.length} job{rows.length === 1 ? '' : 's'}
                   </span>
                 </td>
-                <td className={`${td} font-mono font-bold`}>{md(totals.estMD)}</td>
+                <td className={`${tf} font-mono font-bold`}>{md(totals.estMD)}</td>
                 <td
-                  className={`${td} font-mono font-bold ${tone(totals.actMD, totals.estMD, true)}`}
+                  className={`${tf} font-mono font-bold ${tone(totals.actMD, totals.estMD, true)}`}
                 >
                   {md(totals.actMD)}
                 </td>
-                <td className={`${td} font-bold`}>{money(totals.estLabor)}</td>
-                <td className={`${td} font-bold ${tone(totals.actLabor, totals.estLabor, true)}`}>
+                <td className={`${tf} font-bold`}>{money(totals.estLabor)}</td>
+                <td className={`${tf} font-bold ${tone(totals.actLabor, totals.estLabor, true)}`}>
                   {money(totals.actLabor)}
                 </td>
-                <td className={`${td} font-bold`}>{money(totals.estGP)}</td>
-                <td className={`${td} font-bold`}>{money(totals.actGP)}</td>
-                <td className={`${td} font-bold`}>
+                <td className={`${tf} font-bold`}>{money(totals.estGP)}</td>
+                <td className={`${tf} font-bold`}>{money(totals.actGP)}</td>
+                <td className={`${tf} font-bold`}>
                   {totals.estMD > 0 ? money(totals.estGP / totals.estMD) : '—'}
                 </td>
-                <td className={`${td} font-bold`}>
+                <td className={`${tf} font-bold`}>
                   {totals.actMD > 0 ? money(totals.actGP / totals.actMD) : '—'}
                 </td>
-                <td className={`${td} font-bold`}>{money(totals.subGP)}</td>
-                <td className={`${td} font-bold text-gray-800`}>{Math.round(totalPct * 100)}%</td>
+                <td className={`${tf} font-bold`}>{money(totals.subGP)}</td>
+                <td className={`${tf} font-bold text-gray-800`}>{Math.round(totalPct * 100)}%</td>
               </tr>
             </tfoot>
           </table>

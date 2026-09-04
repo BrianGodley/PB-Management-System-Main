@@ -158,9 +158,7 @@ function JobItem({
           onMouseMove={e => setHoverPos({ x: e.clientX, y: e.clientY })}
           onMouseLeave={() => setHoverPos(null)}
         >
-          <p
-            className={`truncate ${selectedJob === job.id ? 'text-green-800' : 'text-gray-800'}`}
-          >
+          <p className={`truncate ${selectedJob === job.id ? 'text-green-800' : 'text-gray-800'}`}>
             {/* Strip any trailing "(XX)" of 1–3 letters from the stored
                 name — some legacy rows already have initials baked into
                 jobs.name, which would otherwise show as "(XX) (YY)". */}
@@ -905,10 +903,7 @@ export default function JobsList() {
           updates
             .slice(i, i + CONC)
             .map(u =>
-              supabase
-                .from('jobs')
-                .update({ job_supervisor: u.job_supervisor })
-                .eq('id', u.id)
+              supabase.from('jobs').update({ job_supervisor: u.job_supervisor }).eq('id', u.id)
             )
         )
       }
@@ -1204,9 +1199,7 @@ export default function JobsList() {
       job_supervisor: supervisorName,
     }
     await supabase.from('jobs').update(updates).eq('id', jobId)
-    setJobs(prev =>
-      prev.map(j => (j.id === jobId ? { ...j, ...updates } : j)),
-    )
+    setJobs(prev => prev.map(j => (j.id === jobId ? { ...j, ...updates } : j)))
 
     if (isYardCheck) {
       // Make sure the Schedule tab is visible so the modal can render, then
@@ -1277,21 +1270,14 @@ export default function JobsList() {
     })
     .filter(j => {
       if (!filterActive) return true
-      return ((j[filterRole] || '').trim().toLowerCase()) === filterEmpLc
+      return (j[filterRole] || '').trim().toLowerCase() === filterEmpLc
     })
     .filter(j => {
       const q = search.trim().toLowerCase()
       if (!q) return true
       // Match job name, client, and the full address (street/city/state/zip)
       // so a site can be found by address when the client name isn't recalled.
-      const hay = [
-        j.name,
-        j.client_name,
-        j.job_address,
-        j.job_city,
-        j.job_state,
-        j.job_zip,
-      ]
+      const hay = [j.name, j.client_name, j.job_address, j.job_city, j.job_state, j.job_zip]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
@@ -1457,7 +1443,6 @@ export default function JobsList() {
         </div>
       )}
 
-
       {/* Main content: sidebar + right panel (non-settings tabs) */}
       {tab !== 'settings' && (
         <div className="flex gap-0 flex-1 min-h-0 pt-2 -mr-3">
@@ -1485,12 +1470,7 @@ export default function JobsList() {
                   }
                 >
                   <span className="flex items-center gap-1">
-                    <svg
-                      className="w-3 h-3"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -1538,9 +1518,7 @@ export default function JobsList() {
                           <label
                             key={role.key}
                             className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer text-xs ${
-                              filterRole === role.key
-                                ? 'bg-green-50'
-                                : 'hover:bg-gray-50'
+                              filterRole === role.key ? 'bg-green-50' : 'hover:bg-gray-50'
                             }`}
                           >
                             <input
@@ -1568,12 +1546,14 @@ export default function JobsList() {
                           >
                             <option value="">— Select an employee —</option>
                             {[...activeEmployees]
-                              .sort((a, b) =>
-                                (a.last_name || '').localeCompare(b.last_name || '') ||
-                                (a.first_name || '').localeCompare(b.first_name || '')
+                              .sort(
+                                (a, b) =>
+                                  (a.last_name || '').localeCompare(b.last_name || '') ||
+                                  (a.first_name || '').localeCompare(b.first_name || '')
                               )
                               .map(emp => {
-                                const fullName = `${emp.first_name || ''} ${emp.last_name || ''}`.trim()
+                                const fullName =
+                                  `${emp.first_name || ''} ${emp.last_name || ''}`.trim()
                                 return (
                                   <option key={emp.id} value={fullName}>
                                     {emp.last_name}, {emp.first_name}
@@ -1627,11 +1607,7 @@ export default function JobsList() {
                             setFilterEmployee('')
                             setHiddenStages(new Set())
                           }}
-                          disabled={
-                            !filterRole &&
-                            !filterEmployee &&
-                            hiddenStages.size === 0
-                          }
+                          disabled={!filterRole && !filterEmployee && hiddenStages.size === 0}
                           className="flex-1 text-[11px] px-2 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           Clear all
@@ -1817,11 +1793,8 @@ export default function JobsList() {
                   // banner at the top tells the user the filter scope.
                   if (filterActive) {
                     const roleLabel =
-                      (JOB_ROLES.find(r => r.key === filterRole) || {}).label ||
-                      filterRole
-                    const populatedStages = stages.filter(
-                      s => (byStage[s.id] || []).length > 0,
-                    )
+                      (JOB_ROLES.find(r => r.key === filterRole) || {}).label || filterRole
+                    const populatedStages = stages.filter(s => (byStage[s.id] || []).length > 0)
                     const unassignedCount = byStage['__none__'].length
                     return (
                       <>
@@ -1994,6 +1967,7 @@ export default function JobsList() {
               ) : (
                 <AllJobsTracking
                   jobs={jobs}
+                  stages={stages}
                   statusFilter={statusFilter}
                   onSelectJob={setSelectedJob}
                 />
@@ -2907,8 +2881,8 @@ export default function JobsList() {
                   </div>
 
                   <p className="text-[11px] text-gray-400 mt-3 italic">
-                    Applying will set <code className="text-gray-600">job_supervisor</code> on
-                    every assigned job to the supervisor's name.
+                    Applying will set <code className="text-gray-600">job_supervisor</code> on every
+                    assigned job to the supervisor's name.
                   </p>
 
                   <div className="mt-5 flex items-center gap-2">
@@ -3013,9 +2987,7 @@ function EmployeePicker({ employees, currentEmployeeId, targetStageName, onCance
                 <span className="flex-1 truncate">
                   {e.first_name} {e.last_name}
                 </span>
-                <span className="text-xs text-gray-400 font-mono">
-                  {empInitials(e)}
-                </span>
+                <span className="text-xs text-gray-400 font-mono">{empInitials(e)}</span>
               </button>
             )
           })}
@@ -3059,7 +3031,10 @@ function empInitials(emp) {
 // returns "JS" regardless of which format the user entered.
 function supervisorInitials(raw) {
   if (!raw) return ''
-  let s = String(raw).trim().replace(/\s*\([^)]*\)\s*$/, '').trim()
+  let s = String(raw)
+    .trim()
+    .replace(/\s*\([^)]*\)\s*$/, '')
+    .trim()
   if (!s) return ''
   if (s.includes(',')) {
     // "Last, First" → take first letter of "First" then first letter of "Last"
@@ -4092,8 +4067,7 @@ function RowMenu({ items }) {
     const menuWidth = 170
     let left = r.right - menuWidth
     if (left < 8) left = 8
-    if (left + menuWidth > window.innerWidth - 8)
-      left = window.innerWidth - menuWidth - 8
+    if (left + menuWidth > window.innerWidth - 8) left = window.innerWidth - menuWidth - 8
     setPos({ top: r.bottom + 4, left })
   }
 
@@ -4159,7 +4133,7 @@ function RowMenu({ items }) {
               </button>
             ))}
           </div>,
-          document.body,
+          document.body
         )}
     </>
   )
@@ -4292,12 +4266,8 @@ function CsvSnippet({ url }) {
       cancelled = true
     }
   }, [url])
-  if (err)
-    return (
-      <div className="w-full h-28 flex items-center justify-center text-4xl">📊</div>
-    )
-  if (text === null)
-    return <div className="w-full h-28 bg-gray-50 animate-pulse" />
+  if (err) return <div className="w-full h-28 flex items-center justify-center text-4xl">📊</div>
+  if (text === null) return <div className="w-full h-28 bg-gray-50 animate-pulse" />
   const rows = text.split(/\r?\n/).slice(0, 6)
   return (
     <div className="w-full h-28 p-1.5 overflow-hidden text-[8px] leading-tight font-mono text-gray-700 bg-white">
@@ -4328,7 +4298,7 @@ function FilePreview({ f }) {
           }
         }
       },
-      { rootMargin: '200px' },
+      { rootMargin: '200px' }
     )
     io.observe(ref.current)
     return () => io.disconnect()
@@ -4417,8 +4387,7 @@ function FilePreview({ f }) {
   }
   if (isOfficeDoc) {
     const officeUrl =
-      'https://view.officeapps.live.com/op/embed.aspx?src=' +
-      encodeURIComponent(f.publicUrl)
+      'https://view.officeapps.live.com/op/embed.aspx?src=' + encodeURIComponent(f.publicUrl)
     return (
       <a
         ref={ref}
@@ -4629,11 +4598,7 @@ function JobFilesPanel({ job }) {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const { data } = await supabase
-        .from('jobs')
-        .select('id,name')
-        .order('name')
-        .limit(5000)
+      const { data } = await supabase.from('jobs').select('id,name').order('name').limit(5000)
       if (!cancelled && data) setAllJobs(data)
     })()
     return () => {
@@ -4704,8 +4669,7 @@ function JobFilesPanel({ job }) {
         .from('job-files')
         .upload(path, file, { contentType: file.type || undefined })
       if (upErr) throw upErr
-      const isMedia =
-        file.type?.startsWith('image/') || file.type?.startsWith('video/')
+      const isMedia = file.type?.startsWith('image/') || file.type?.startsWith('video/')
       const { error: insErr } = await supabase.from('job_files').insert({
         job_id: job.id,
         file_name: file.name,
@@ -4778,10 +4742,7 @@ function JobFilesPanel({ job }) {
 
   // ── File rename ────────────────────────────────────────────────────
   async function handleRenameFile(f, newName) {
-    const { error } = await supabase
-      .from('job_files')
-      .update({ file_name: newName })
-      .eq('id', f.id)
+    const { error } = await supabase.from('job_files').update({ file_name: newName }).eq('id', f.id)
     if (error) return alert('Rename failed: ' + error.message)
     setFiles(prev => prev.map(x => (x.id === f.id ? { ...x, file_name: newName } : x)))
   }
@@ -4816,9 +4777,7 @@ function JobFilesPanel({ job }) {
           .eq('id', file.id)
         if (error) throw error
         setFiles(prev =>
-          prev.map(x =>
-            x.id === file.id ? { ...x, folder_id: targetFolderId || null } : x
-          )
+          prev.map(x => (x.id === file.id ? { ...x, folder_id: targetFolderId || null } : x))
         )
       } else {
         // Cross-job move OR copy (same or different job): need new storage object
@@ -4883,12 +4842,8 @@ function JobFilesPanel({ job }) {
       .update({ folder_name: newName })
       .eq('id', folder.id)
     if (error) return alert('Rename failed: ' + error.message)
-    setFolders(prev =>
-      prev.map(x => (x.id === folder.id ? { ...x, folder_name: newName } : x))
-    )
-    setFolderStack(prev =>
-      prev.map(x => (x.id === folder.id ? { ...x, name: newName } : x))
-    )
+    setFolders(prev => prev.map(x => (x.id === folder.id ? { ...x, folder_name: newName } : x)))
+    setFolderStack(prev => prev.map(x => (x.id === folder.id ? { ...x, name: newName } : x)))
   }
 
   // Helper: collect a folder's id + every descendant folder id within job
@@ -4916,7 +4871,7 @@ function JobFilesPanel({ job }) {
   async function handleDeleteFolderRecursive(folder) {
     if (
       !confirm(
-        `Delete folder "${folder.folder_name}" and ALL files + subfolders inside it? This cannot be undone.`,
+        `Delete folder "${folder.folder_name}" and ALL files + subfolders inside it? This cannot be undone.`
       )
     )
       return
@@ -4940,7 +4895,7 @@ function JobFilesPanel({ job }) {
           .delete()
           .in(
             'id',
-            descFiles.map(x => x.id),
+            descFiles.map(x => x.id)
           )
       }
       await supabase.from('job_folders').delete().in('id', idList)
@@ -4975,8 +4930,8 @@ function JobFilesPanel({ job }) {
         if (error) throw error
         setFolders(prev =>
           prev.map(x =>
-            x.id === folder.id ? { ...x, parent_folder_id: targetFolderId || null } : x,
-          ),
+            x.id === folder.id ? { ...x, parent_folder_id: targetFolderId || null } : x
+          )
         )
       } else {
         // Different job: rewrite job_id on folder + all descendants + every
@@ -5008,7 +4963,7 @@ function JobFilesPanel({ job }) {
             .update({ job_id: targetJobId })
             .in(
               'id',
-              descFiles.map(x => x.id),
+              descFiles.map(x => x.id)
             )
         }
         setFolders(prev => prev.filter(f => !descIds.has(f.id)))
@@ -5072,8 +5027,7 @@ function JobFilesPanel({ job }) {
     ? allTabFiles.filter(f => f.folder_id === currentFolderId)
     : allTabFiles.filter(f => !f.folder_id)
 
-  const rootIsEmpty =
-    !filesLoading && activeFolders.length === 0 && visibleFiles.length === 0
+  const rootIsEmpty = !filesLoading && activeFolders.length === 0 && visibleFiles.length === 0
   const folderIsEmpty = !filesLoading && visibleFiles.length === 0
 
   if (!job)
