@@ -232,15 +232,15 @@ export default function AllJobsTracking({ jobs = [], statusFilter = 'open', onSe
             <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className={`${th} text-left`}>Job</th>
-                <th className={th}>Estimated man days</th>
-                <th className={th}>Actual man days</th>
-                <th className={th}>Estimated labor</th>
-                <th className={th}>Actual labor</th>
-                <th className={th}>Estimated gross profit</th>
-                <th className={th}>Actual gross profit</th>
+                <th className={th}>Estimated Man Days</th>
+                <th className={th}>Actual Man Days</th>
+                <th className={th}>Estimated Labor</th>
+                <th className={th}>Actual Labor</th>
+                <th className={th}>Estimated Gross Profit</th>
+                <th className={th}>Actual Gross Profit</th>
                 <th className={th}>Estimated GLPMD</th>
                 <th className={th}>Actual GLPMD</th>
-                <th className={th}>Sub gross profit</th>
+                <th className={th}>Sub Gross Profit</th>
                 <th className={th}>Completion %</th>
               </tr>
             </thead>
