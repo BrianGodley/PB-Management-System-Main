@@ -48,6 +48,7 @@ export default function LaborRatesTab() {
 
   const [form, setForm] = useState({
     avg_hourly_crew_rate: '',
+    overtime_multiplier: '1.5',
     burden_fica_rate: '6.2',
     burden_medicare_rate: '1.45',
     burden_futa_rate: '0.6',
@@ -65,7 +66,7 @@ export default function LaborRatesTab() {
         supabase
           .from('company_settings')
           .select(
-            'id, avg_hourly_crew_rate, burden_fica_rate, burden_medicare_rate, burden_futa_rate, burden_suta_rate, burden_workcomp_rate, burden_sdi_rate, burden_gl_rate, avg_pto_days'
+            'id, avg_hourly_crew_rate, overtime_multiplier, burden_fica_rate, burden_medicare_rate, burden_futa_rate, burden_suta_rate, burden_workcomp_rate, burden_sdi_rate, burden_gl_rate, avg_pto_days'
           )
           .maybeSingle(),
         supabase
@@ -81,6 +82,8 @@ export default function LaborRatesTab() {
         setForm(f => ({
           ...f,
           avg_hourly_crew_rate: cs.data.avg_hourly_crew_rate != null ? String(cs.data.avg_hourly_crew_rate) : '',
+          overtime_multiplier:
+            cs.data.overtime_multiplier != null ? String(cs.data.overtime_multiplier) : '',
           burden_fica_rate: String(cs.data.burden_fica_rate ?? '6.2'),
           burden_medicare_rate: String(cs.data.burden_medicare_rate ?? '1.45'),
           burden_futa_rate: String(cs.data.burden_futa_rate ?? '0.6'),
@@ -124,6 +127,10 @@ export default function LaborRatesTab() {
       setMsg('error:Enter an average hourly crew rate first.')
       return
     }
+    if (!(num(form.overtime_multiplier) > 0)) {
+      setMsg('error:Enter an overtime multiplier (1.5 = time and a half).')
+      return
+    }
     if (!settingsId) {
       setMsg('error:Company settings row not found.')
       return
@@ -136,6 +143,7 @@ export default function LaborRatesTab() {
     const burdenFraction = burdenPct / 100 // burdenPct already includes the PTO %
     const payload = {
       avg_hourly_crew_rate: base,
+      overtime_multiplier: num(form.overtime_multiplier),
       burden_fica_rate: num(form.burden_fica_rate),
       burden_medicare_rate: num(form.burden_medicare_rate),
       burden_futa_rate: num(form.burden_futa_rate),
@@ -194,6 +202,25 @@ export default function LaborRatesTab() {
             />
           </div>
           <p className="text-[11px] text-gray-400 mt-1">The base crew wage used in the calculation.</p>
+          <label className={`${lblGreen} mt-4`}>
+            Overtime Multiplier <span className="font-normal">(1.5 = time and a half)</span>
+          </label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-green-600 text-sm">×</span>
+            <input
+              type="number"
+              step="0.05"
+              min="1"
+              value={form.overtime_multiplier}
+              onChange={e => set('overtime_multiplier', e.target.value)}
+              placeholder="1.5"
+              className={`${inpGreen} pl-7`}
+            />
+          </div>
+          <p className="text-[11px] text-gray-400 mt-1">
+            Applied to hours past 8 in one person's day. Job profit will not calculate
+            until this and the crew rate are both set — no default is assumed.
+          </p>
         </div>
         <div>
           <label className={lbl}>
