@@ -94,11 +94,8 @@ export default function ModuleCompletionGrid({
     d.setDate(d.getDate() - 1)
     return d.toISOString().slice(0, 10)
   }
-  // The day's gain for one module, and for the job as a whole. The job figure is
-  // weighted by each module's estimated profit, so finishing a big module moves
-  // the number more than finishing a small one — the same weighting the profit
-  // engine uses, which is why the row lands on 100% exactly when the job does.
-  const gain = (moduleId, date) => cumAt(moduleId, date) - cumAt(moduleId, prevDay(date))
+  // Weighted by what each module is worth in profit, so finishing a big module
+  // moves the job figure more than finishing a small one.
   // What each module is worth in profit: its labour GP plus the sub GP riding on
   // it. Both are earned by the same completion percentage, and the row's total
   // cell already sums both — so the day columns weight by the same figure.
@@ -291,7 +288,6 @@ export default function ModuleCompletionGrid({
                   </span>
                 </th>
               ))}
-              <th className="py-2 px-4 text-center font-bold">Total GP Earned</th>
               <th className="py-2 px-4 text-center font-bold">Complete</th>
             </tr>
           </thead>
@@ -329,28 +325,9 @@ export default function ModuleCompletionGrid({
                           placeholder="—"
                           className="w-14 text-center border border-gray-300 rounded px-1 py-1 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
                         />
-                        {/* The day's gain, so the sequence reads as progress
-                            rather than a column of unrelated percentages. */}
-                        {cellValue(m.id, d) !== '' && (
-                          <span
-                            className={`block text-[10px] tabular-nums mt-0.5 ${
-                              gain(m.id, d) > 0
-                                ? 'text-green-600'
-                                : gain(m.id, d) < 0
-                                  ? 'text-red-500'
-                                  : 'text-gray-300'
-                            }`}
-                          >
-                            {gain(m.id, d) > 0 ? '+' : ''}
-                            {Math.round(gain(m.id, d))}%
-                          </span>
-                        )}
                       </td>
                     )
                   })}
-                  <td className="py-2 px-4 text-center tabular-nums font-semibold text-green-700">
-                    {row ? fmt(row.earnedLaborGp + (row.earnedSubGp || 0)) : '—'}
-                  </td>
                   <td className="py-2 px-4 text-center">
                     <span
                       className={`text-sm font-bold ${
@@ -368,7 +345,12 @@ export default function ModuleCompletionGrid({
                 this one answers "what did we make on Tuesday?". A day can come
                 out negative when a PM restates an earlier reading downward. */}
             <tr className="bg-gray-50/60 border-t-2 border-gray-200">
-              <td className="py-2 px-4 font-bold text-gray-700">Weekly Job Gross Profit Earned</td>
+              <td className="py-2 px-4 font-bold text-gray-700">
+                Weekly Job Gross Profit Earned
+                <span className="ml-2 font-bold text-green-700 tabular-nums">
+                  {fmt(jobEarnedAt(week[6]) - jobEarnedAt(prevDay(week[0])))}
+                </span>
+              </td>
               {week.map(d => {
                 const gained = jobEarnedAt(d) - jobEarnedAt(prevDay(d))
                 return (
@@ -383,9 +365,6 @@ export default function ModuleCompletionGrid({
                   </td>
                 )
               })}
-              <td className="py-2 px-4 text-center tabular-nums font-bold text-green-700">
-                {fmt(jobEarnedAt(week[6]) - jobEarnedAt(prevDay(week[0])))}
-              </td>
               <td className="py-2 px-4" />
             </tr>
 
@@ -393,36 +372,19 @@ export default function ModuleCompletionGrid({
                 estimated profit. Modules run in sequence and sometimes overlap;
                 this is the line that shows the job as a whole marching to 100%. */}
             <tr className="bg-gray-50 border-t border-gray-200">
-              <td className="py-2 px-4 font-bold text-gray-700">Total Job Gross Profit Earned</td>
-              {week.map(d => {
-                const cum = jobCumAt(d)
-                const delta = cum - jobCumAt(prevDay(d))
-                return (
-                  <td key={d} className="py-2 px-1 text-center">
-                    <span className="block text-sm font-bold tabular-nums text-green-700">
-                      {fmt(jobEarnedAt(d))}
-                    </span>
-                    <span className="block text-xs tabular-nums text-gray-600">
-                      {Math.round(cum)}%
-                    </span>
-                    <span
-                      className={`block text-[10px] tabular-nums ${
-                        delta > 0 ? 'text-green-600' : 'text-gray-300'
-                      }`}
-                    >
-                      {delta > 0 ? `+${delta.toFixed(1)}%` : '—'}
-                    </span>
-                  </td>
-                )
-              })}
-              <td className="py-2 px-4 text-center tabular-nums font-bold text-green-700">
-                {fmt(
-                  (rows || []).reduce(
-                    (sum, r) => sum + r.earnedLaborGp + (r.earnedSubGp || 0),
-                    0
-                  )
-                )}
+              <td className="py-2 px-4 font-bold text-gray-700">
+                Total Job Gross Profit Earned
+                <span className="ml-2 font-bold text-green-700 tabular-nums">
+                  {fmt(jobEarnedAt(week[6]))}
+                </span>
               </td>
+              {week.map(d => (
+                <td key={d} className="py-2 px-1 text-center">
+                  <span className="text-sm font-bold tabular-nums text-green-700">
+                    {fmt(jobEarnedAt(d))}
+                  </span>
+                </td>
+              ))}
               <td className="py-2 px-4 text-center">
                 <span
                   className={`text-sm font-bold ${

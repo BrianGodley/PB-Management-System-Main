@@ -831,3 +831,14 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   an earlier reading downward looks like.
 - Verified the two rows tie: $35 + $176 + $564 + $636 + $954 = $2,366, matching the total
   row's movement across the week ($5,089 → $7,455).
+
+## Completion grid — columns pared back
+
+- Running PERCENTAGES removed from Total Job Gross Profit Earned; the row is dollars only.
+- The per-module **Total GP Earned column** removed entirely. Each summary row's own total
+  moved next to its title instead — `Weekly Job Gross Profit Earned $2,366`,
+  `Total Job Gross Profit Earned $7,455` — so the figures survive the column going.
+- The `+5%` gain caption under each day's entry box removed, along with the now-orphaned
+  `gain()` helper that only fed it.
+- Grid is now: MODULE · seven day columns · COMPLETE. Header and body cell counts verified
+  in sync at 9.
