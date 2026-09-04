@@ -16,6 +16,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { readCachedPrefs, fetchUserPrefs, saveUserPref } from '../lib/userPrefs'
 import { resolveRates, jobProfitAsOf, completionAsOf } from '../lib/jobProfit'
 
 function isJobOpen(j) {
@@ -60,18 +61,12 @@ async function fetchIn(table, column, ids, select) {
 
 const NO_STAGE = '__none__'
 // The saved view is one person's preference about what to look at, not shared
-// company data — so it is keyed by user id and never leaves their browser. Two
-// people on the same machine keep separate views.
-const viewKey = userId => `pb.tracking.allJobs.stageFilter:${userId || 'anon'}`
+// company data. It is stored per user in dashboard_preferences.prefs so it
+// follows them to any machine; the local cache only decides what paints on the
+// first frame.
+const PREF_KEY = 'trackingStageFilter'
 
-function loadSavedView(userId) {
-  try {
-    const raw = localStorage.getItem(viewKey(userId))
-    return raw ? new Set(JSON.parse(raw)) : new Set()
-  } catch {
-    return new Set()
-  }
-}
+const toSet = v => new Set(Array.isArray(v) ? v : [])
 
 export default function AllJobsTracking({
   jobs = [],
@@ -88,12 +83,25 @@ export default function AllJobsTracking({
   const [loading, setLoading] = useState(true)
   // Stages the user has switched OFF. Empty means everything is included, so a
   // stage added to the pipeline later shows up without anyone re-picking it.
-  const [excludedStages, setExcludedStages] = useState(() => loadSavedView(userId))
+  const [excludedStages, setExcludedStages] = useState(() =>
+    toSet(readCachedPrefs(userId)[PREF_KEY])
+  )
+  // The saved view is only applied while the user has not touched the filter,
+  // so a slow round trip never yanks a choice out from under them.
+  const touchedRef = useRef(false)
   const [stageOpen, setStageOpen] = useState(false)
   useEffect(() => {
-    setExcludedStages(loadSavedView(userId))
+    let cancelled = false
+    touchedRef.current = false
+    setExcludedStages(toSet(readCachedPrefs(userId)[PREF_KEY]))
+    fetchUserPrefs(userId).then(prefs => {
+      if (!cancelled && !touchedRef.current) setExcludedStages(toSet(prefs[PREF_KEY]))
+    })
+    return () => {
+      cancelled = true
+    }
   }, [userId])
-  const [savedFlash, setSavedFlash] = useState(false)
+  const [savedFlash, setSavedFlash] = useState(null)
   const stageRef = useRef(null)
 
   // Click anywhere outside the panel to close it.
@@ -106,15 +114,10 @@ export default function AllJobsTracking({
     return () => document.removeEventListener('mousedown', onDown)
   }, [stageOpen])
 
-  function saveView() {
-    try {
-      localStorage.setItem(viewKey(userId), JSON.stringify([...excludedStages]))
-      setSavedFlash(true)
-      setTimeout(() => setSavedFlash(false), 1800)
-    } catch {
-      // Private browsing or a full store — the filter still applies, it just
-      // will not survive a reload, so say nothing rather than block the user.
-    }
+  async function saveView() {
+    const ok = await saveUserPref(userId, PREF_KEY, [...excludedStages])
+    setSavedFlash(ok ? 'account' : 'local')
+    setTimeout(() => setSavedFlash(null), 2600)
   }
 
   const visible = useMemo(
@@ -157,6 +160,7 @@ export default function AllJobsTracking({
   }, [stageChips, excludedStages])
 
   function toggleStage(id) {
+    touchedRef.current = true
     setExcludedStages(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -340,13 +344,19 @@ export default function AllJobsTracking({
                   </span>
                   <span className="flex gap-2">
                     <button
-                      onClick={() => setExcludedStages(new Set())}
+                      onClick={() => {
+                        touchedRef.current = true
+                        setExcludedStages(new Set())
+                      }}
                       className="text-xs font-semibold text-green-700 hover:underline"
                     >
                       All
                     </button>
                     <button
-                      onClick={() => setExcludedStages(new Set(stageChips.map(c => c.id)))}
+                      onClick={() => {
+                        touchedRef.current = true
+                        setExcludedStages(new Set(stageChips.map(c => c.id)))
+                      }}
                       className="text-xs font-semibold text-gray-500 hover:underline"
                     >
                       None
@@ -393,9 +403,14 @@ export default function AllJobsTracking({
             )}
           </div>
 
-          {savedFlash && (
+          {savedFlash === 'account' && (
             <span className="text-sm font-semibold text-green-700">
-              Saved — this is your default
+              Saved — your default on any device
+            </span>
+          )}
+          {savedFlash === 'local' && (
+            <span className="text-sm font-semibold text-amber-700">
+              Saved on this device only — could not reach the server
             </span>
           )}
         </div>
