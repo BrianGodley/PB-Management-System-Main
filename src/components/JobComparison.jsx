@@ -198,6 +198,8 @@ function Group({ title, accent, grow, children }) {
 // bar's 30.4 clocked MD at $253.20 = $7,707. Scheduled days are still shown —
 // they are a real and different fact — but ACTUAL now means clocked, everywhere.
 function ModuleTable({ workOrders, crewMap, profitRows, crewFirst = false }) {
+  const [selected, setSelected] = useState(new Set())
+  const [filterOpen, setFilterOpen] = useState(false)
   const byModule = useMemo(() => {
     const m = new Map()
     for (const r of profitRows || []) m.set(r.id, r)
@@ -217,19 +219,40 @@ function ModuleTable({ workOrders, crewMap, profitRows, crewFirst = false }) {
     return { wo, estMD, actMD, estMat, estLab, actLab, crew }
   })
 
+  // Empty selection means "all" — the filter narrows, it never hides everything
+  // by default.
+  const allCrews = useMemo(() => {
+    const m = new Map()
+    for (const r of rows) {
+      const id = r.crew?.id || '__unassigned__'
+      if (!m.has(id)) m.set(id, { id, label: r.crew?.label || '__unassigned__' })
+    }
+    return [...m.values()].sort((a, b) =>
+      a.label === '__unassigned__'
+        ? 1
+        : b.label === '__unassigned__'
+          ? -1
+          : a.label.localeCompare(b.label)
+    )
+  }, [rows])
+
+  const visibleRows =
+    selected.size === 0 ? rows : rows.filter(r => selected.has(r.crew?.id || '__unassigned__'))
+
   if (crewFirst) {
-    rows.sort((a, b) => {
+    visibleRows.sort((a, b) => {
       const al = a.crew?.label || 'zz'
       const bl = b.crew?.label || 'zz'
       return al === bl ? a.wo.module_type.localeCompare(b.wo.module_type) : al.localeCompare(bl)
     })
   }
 
-  const totEstMD = rows.reduce((s, r) => s + r.estMD, 0)
-  const totActMD = rows.reduce((s, r) => s + (r.actMD || 0), 0)
-  const totEstMat = rows.reduce((s, r) => s + r.estMat, 0)
-  const totEstLab = rows.reduce((s, r) => s + r.estLab, 0)
-  const totActLab = rows.reduce((s, r) => s + (r.actLab || 0), 0)
+  // Totals follow the filter, so a single-crew view sums that crew alone.
+  const totEstMD = visibleRows.reduce((s, r) => s + r.estMD, 0)
+  const totActMD = visibleRows.reduce((s, r) => s + (r.actMD || 0), 0)
+  const totEstMat = visibleRows.reduce((s, r) => s + r.estMat, 0)
+  const totEstLab = visibleRows.reduce((s, r) => s + r.estLab, 0)
+  const totActLab = visibleRows.reduce((s, r) => s + (r.actLab || 0), 0)
 
   // A reference table people read across, so it carries a size up from the
   // 10px/14px the denser panels use.
@@ -238,10 +261,65 @@ function ModuleTable({ workOrders, crewMap, profitRows, crewFirst = false }) {
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+      <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50 flex items-center justify-between gap-3 flex-wrap">
         <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">
-          Module Breakdown
+          {crewFirst ? 'Crew Breakdown' : 'Module Breakdown'}
         </span>
+        {crewFirst && allCrews.length > 1 && (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setFilterOpen(o => !o)}
+              className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 font-medium"
+            >
+              {selected.size === 0
+                ? 'All crews'
+                : selected.size === 1
+                  ? `Crew ${allCrews.find(c => selected.has(c.id))?.label}`
+                  : `${selected.size} crews`}
+              <span className="ml-1.5 text-gray-400">▾</span>
+            </button>
+            {filterOpen && (
+              <>
+                {/* Click-away layer: a dropdown that only closes via its own
+                    button is a dropdown people leave open by accident. */}
+                <div className="fixed inset-0 z-10" onClick={() => setFilterOpen(false)} />
+                <div className="absolute right-0 mt-1 z-20 w-52 rounded-lg border border-gray-200 bg-white shadow-lg py-1">
+                  <button
+                    type="button"
+                    onClick={() => setSelected(new Set())}
+                    className={`w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 ${
+                      selected.size === 0 ? 'font-bold text-green-700' : 'text-gray-700'
+                    }`}
+                  >
+                    All crews
+                  </button>
+                  <div className="my-1 border-t border-gray-100" />
+                  {allCrews.map(c => (
+                    <label
+                      key={c.id}
+                      className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected.has(c.id)}
+                        onChange={() =>
+                          setSelected(prev => {
+                            const next = new Set(prev)
+                            next.has(c.id) ? next.delete(c.id) : next.add(c.id)
+                            return next
+                          })
+                        }
+                        className="w-4 h-4 rounded accent-green-700"
+                      />
+                      {c.label === '__unassigned__' ? 'Unassigned' : `Crew ${c.label}`}
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[700px]">
@@ -260,7 +338,7 @@ function ModuleTable({ workOrders, crewMap, profitRows, crewFirst = false }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {rows.map(({ wo, estMD, actMD, estMat, estLab, actLab, crew }) => {
+            {visibleRows.map(({ wo, estMD, actMD, estMat, estLab, actLab, crew }) => {
               const mdDelta = actMD == null ? null : actMD - estMD
               const labDelta = actLab == null ? null : actLab - estLab
               const moduleCell = (

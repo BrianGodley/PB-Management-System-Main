@@ -1051,3 +1051,16 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   Difference and Labor Difference read as footnotes beside 16px figures. Now 16px with the
   percentage at 12px. Verified at 16px in BOTH Module Breakdown and Crew Breakdown — they
   share `ModuleTable`, so the single change covers both.
+
+## Crew Breakdown — own title and a crew filter
+
+- The panel heading follows the view: "Module Breakdown" or "Crew Breakdown". It had read
+  Module Breakdown in both since the two views were merged into one component.
+- Crew Breakdown carries a filter beside the title, defaulting to **All crews**. Checkboxes
+  select one or several; the label reads "All crews", "Crew C", or "3 crews". Only rendered
+  on the crew view, and only when a job has more than one crew.
+- An EMPTY selection means all — the filter narrows, it never starts by hiding everything.
+- The totals row follows the filter, so a single-crew view sums that crew alone. Verified:
+  all crews 5 rows / 32 → 33 MD / $8,102, one crew 2 rows / 9.5 → 12 MD / $2,405.
+- A full-screen click-away layer closes the dropdown; one that only closes via its own button
+  gets left open by accident.
