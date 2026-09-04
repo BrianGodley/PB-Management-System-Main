@@ -521,3 +521,13 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - Result: faster jobs return +$1,544 to +$2,036 over GLPE, on-estimate jobs land within
   0.1%, over jobs return −$2,902 to −$3,634, GLPMDA spans $224–$734 against GLPMDE of
   $400–$550, and 100% of hours resolve to a module through the work order chain.
+
+## Tracker navigation — a peer tab, not a detour
+
+- The Tracker was reachable only from a green "Open Job Tracker" button above the job's tab
+  strip, so it read as a side trip and was easy to miss entirely.
+- `components/JobTabs.jsx` is now shared by the job page and the tracker:
+  `🏗 Projects · 📋 Change Orders · 📊 Tracker · 📁 Documents`. Tracker keeps its own route
+  (a PM opens and links to it directly); the other three are in-page panels, addressable as
+  `?tab=<key>` so a tab is linkable from the tracker and survives a refresh.
+- The redundant green button is gone — one discoverable path, not two.

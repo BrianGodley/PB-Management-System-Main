@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import JobTabs from '../components/JobTabs'
 import { useAuth } from '../contexts/AuthContext'
 
 const STATUS_LABELS = {
@@ -19,7 +20,9 @@ export default function JobDetail() {
   const [showCOForm, setShowCOForm] = useState(false)
   const [savingCO, setSavingCO] = useState(false)
   const [editingStatus, setEditingStatus] = useState(false)
-  const [activeTab, setActiveTab] = useState('projects')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activeTab = searchParams.get('tab') || 'projects'
+  const setActiveTab = key => setSearchParams(key === 'projects' ? {} : { tab: key })
   const [files, setFiles] = useState([])
   const [filesLoading, setFilesLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -314,33 +317,9 @@ export default function JobDetail() {
 
         {job.notes && <p className="mt-3 text-sm text-gray-500 italic">{job.notes}</p>}
 
-        <div className="mt-4">
-          <Link to={`/jobs/${id}/tracker`} className="btn-primary w-full text-center block">
-            📊 Open Job Tracker
-          </Link>
-        </div>
       </div>
 
-      {/* Tab nav */}
-      <div className="flex gap-0 border-b border-gray-200 mb-4">
-        {[
-          { key: 'projects', label: '🏗 Projects' },
-          { key: 'change_orders', label: '📋 Change Orders' },
-          { key: 'documents', label: '📁 Documents' },
-        ].map(t => (
-          <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key)}
-            className={`px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
-              activeTab === t.key
-                ? 'border-green-700 text-green-800'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <JobTabs jobId={id} active={activeTab} onSelect={setActiveTab} />
 
       {/* Projects */}
       {activeTab === 'projects' && (

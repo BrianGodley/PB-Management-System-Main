@@ -12,6 +12,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import JobTabs from '../components/JobTabs'
 import { useAuth } from '../contexts/AuthContext'
 import {
   resolveRates,
@@ -211,10 +212,14 @@ export default function JobTracker() {
       </div>
 
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Job Tracker</h1>
-      <p className="text-gray-500 text-sm mb-5">
+      <p className="text-gray-500 text-sm mb-4">
         {job.client_name}
         {job.job_address ? ` — ${job.job_address}` : ''}
       </p>
+
+      {/* Same strip as the job page, so Tracker reads as a peer of Projects and
+          Change Orders rather than a detour with only a breadcrumb back. */}
+      <JobTabs jobId={id} active="tracker" />
 
       {/* No-fallback rule: an unset rate stops the calculation and says so,
           rather than resolving to a constant and reporting invented profit. */}
