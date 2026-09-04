@@ -300,7 +300,7 @@ export default function ModuleCompletionGrid({
                   </span>
                 </th>
               ))}
-              <th className="py-2 px-4 text-center font-bold">Completion %</th>
+              <th className="py-2 px-4 text-center font-bold text-sm">Completion %</th>
             </tr>
           </thead>
           <tbody>
