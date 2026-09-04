@@ -860,3 +860,24 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   went stale every time a column width changed — it was 7px off before the entry boxes grew
   and further off after. A colSpan is centred over exactly those seven columns by
   construction. Measured at 0px offset.
+
+## Tracking tab — four sections replace Overall / By Crew
+
+- The Tracking tab now has one toolbar row: the week picker on the left, four section
+  toggles on the right — **📈 Progress · 👷 Crew · ⏱ Payroll · 📋 Breakdown**. The summary
+  bar sits above it and is always visible.
+  - Progress — the completion grid
+  - Crew — the per-crew panels that were behind the old By Crew toggle
+  - Payroll — the payroll hours bar and the payroll records table
+  - Breakdown — the module breakdown table and the accounting panel
+- The Overall / By Crew toggle is gone from the breadcrumb row, along with `trackingView`
+  in JobsList and the `view` prop on JobComparison.
+- REFACTOR: `WeekPicker` extracted from `ModuleCompletionGrid`, and `weekOf` lifted into
+  `JobComparison`. The picker had to leave the grid because the toggles must stay on screen
+  when Progress is not showing, and a control nested inside the grid disappears with it.
+  `weekBounds()` is now shared by both. `dataWeeks` removed as orphaned.
+- The picker is HIDDEN on the three reference sections — it only governs Progress, so
+  leaving it visible would offer a control that does nothing. A min-height keeps the toggles
+  from jumping when it hides.
+- Verified: all four sections render their content, the picker shows only on Progress, no
+  page errors, 336 unit tests still green.

@@ -6,7 +6,7 @@ import {
   attributeHoursByModule,
   weekDates,
 } from '../lib/jobProfit'
-import ModuleCompletionGrid from './ModuleCompletionGrid'
+import ModuleCompletionGrid, { WeekPicker, weekBounds } from './ModuleCompletionGrid'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -833,8 +833,15 @@ function CrewSection({ crewLabel, workOrders, scheduleItems, crewMap, laborRate,
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-export default function JobComparison({ job, view = 'overall' }) {
-  const tab = view
+export default function JobComparison({ job }) {
+  // Four sections instead of the old Overall / By Crew pair. Progress is the
+  // working surface; the rest are reference. weekOf lives here rather than in
+  // the grid so the picker can share a row with the section toggles and stay
+  // put when another section is showing.
+  const jobStart =
+    job?.sold_date || job?.projected_start || job?.actual_start || job?.created_at
+  const [section, setSection] = useState('progress')
+  const [weekOf, setWeekOf] = useState(new Date().toISOString().slice(0, 10))
   const [workOrders, setWorkOrders] = useState([])
   const [scheduleItems, setScheduleItems] = useState([])
   const [timeEntries, setTimeEntries] = useState([])
@@ -1058,11 +1065,9 @@ export default function JobComparison({ job, view = 'overall' }) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* ── OVERALL TAB ── */}
-      {tab === 'overall' && (
-        <>
-          {/* KPI summary cards + payroll bar scroll together with the detail
-              below (no longer frozen). */}
+      {/* The summary bar is always on; the four sections below it swap. */}
+      <>
+
           <div className="flex-1 min-h-0 overflow-y-auto space-y-4 mt-4">
             {/* Summary bar — estimated and actual as separate cards, so a
                 column heading says what the figure IS and the card says which
@@ -1176,20 +1181,59 @@ export default function JobComparison({ job, view = 'overall' }) {
               </Group>
             </div>
 
-          {/* The PM's daily completion entry — the one human input the profit
-              figures above depend on. The timeclock says what was spent; only a
-              person can say what was finished. */}
-          <ModuleCompletionGrid
-            jobId={job.id}
-            modules={estModules}
-            completions={completions}
-            rows={profit?.rows || []}
-            onChange={setCompletions}
-            jobStartDate={job.sold_date || job.projected_start || job.actual_start || job.created_at}
-          />
+          {/* One row: the week chooser where it is useful, the section chooser
+              always. The picker only governs Progress, so it is hidden for the
+              reference sections rather than sitting there doing nothing. */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="min-h-[34px] flex items-center">
+              {section === 'progress' ? (
+                <WeekPicker
+                  weekOf={weekOf}
+                  setWeekOf={setWeekOf}
+                  jobStartDate={jobStart}
+                  completions={completions}
+                />
+              ) : null}
+            </div>
+            <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+              {[
+                { key: 'progress', label: '📈 Progress' },
+                { key: 'crew', label: '👷 Crew' },
+                { key: 'payroll', label: '⏱ Payroll' },
+                { key: 'breakdown', label: '📋 Breakdown' },
+              ].map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => setSection(t.key)}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    section === t.key
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-          {/* Payroll hours info row */}
-          {c.payrollHours > 0 && (
+          {/* ── PROGRESS — the PM's daily completion entry, the one human input
+              the profit figures above depend on. The timeclock says what was
+              spent; only a person can say what was finished. */}
+          {section === 'progress' && (
+            <ModuleCompletionGrid
+              jobId={job.id}
+              modules={estModules}
+              completions={completions}
+              rows={profit?.rows || []}
+              onChange={setCompletions}
+              weekOf={weekOf}
+              jobStartDate={jobStart}
+            />
+          )}
+
+          {/* ── PAYROLL ── */}
+          {section === 'payroll' && c.payrollHours > 0 && (
             <div className="flex flex-wrap gap-3 px-4 py-2.5 bg-blue-50 rounded-xl border border-blue-100 text-sm">
               <span className="text-blue-700 font-semibold">⏱ Payroll:</span>
               <span className="text-gray-700">{c.payrollHours.toFixed(1)}h clocked</span>
@@ -1207,8 +1251,12 @@ export default function JobComparison({ job, view = 'overall' }) {
             </div>
           )}
 
-          {/* Module table */}
-            {workOrders.length > 0 && (
+          {section === 'payroll' && (
+              <PayrollPanel timeEntries={timeEntries} scheduledManDays={c.scheduledManDays} />
+            )}
+
+            {/* ── BREAKDOWN — the module table and the accounting detail ── */}
+            {section === 'breakdown' && workOrders.length > 0 && (
               <ModuleTable
                 workOrders={workOrders}
                 scheduleItems={scheduleItems}
@@ -1216,18 +1264,13 @@ export default function JobComparison({ job, view = 'overall' }) {
                 laborRate={laborRate}
               />
             )}
-
-            {/* Payroll detail */}
-            <PayrollPanel timeEntries={timeEntries} scheduledManDays={c.scheduledManDays} />
-
-            {/* Accounting panel */}
-            <AccountingPanel bills={bills} invoices={invoices} />
+            {section === 'breakdown' && <AccountingPanel bills={bills} invoices={invoices} />}
           </div>
         </>
       )}
 
-      {/* ── BY CREW TAB ── */}
-      {tab === 'by-crew' && (
+      {/* ── CREW ── */}
+      {section === 'crew' && (
         <div className="flex-1 min-h-0 overflow-y-auto space-y-3 mt-4">
           {Object.entries(crewGroups)
             .filter(([key]) => key !== '__unassigned__')

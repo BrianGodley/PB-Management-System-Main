@@ -30,53 +30,136 @@ const usShort = iso => {
 const today = () => new Date().toISOString().slice(0, 10)
 const fmt = v => `$${Math.round(v || 0).toLocaleString()}`
 
+// The week bounds, shared by the picker and the grid: a job cannot have progress
+// before it existed, and nobody can report work that has not happened yet.
+// ─────────────────────────────────────────────────────────────────────────────
+// The week chooser. Lifted out of the grid so it can sit beside the section
+// toggles: the toggles have to stay on screen when Progress is not the section
+// showing, and a control nested inside the grid would disappear with it.
+// ─────────────────────────────────────────────────────────────────────────────
+export function WeekPicker({ weekOf, setWeekOf, jobStartDate, completions }) {
+  const week = useMemo(() => weekDates(weekOf), [weekOf])
+  const { floorWeek, ceilingWeek } = useMemo(() => weekBounds(jobStartDate), [jobStartDate])
+  const atFloor = floorWeek != null && week[0] <= floorWeek
+  const atCeiling = week[0] >= ceilingWeek
+
+  // A job sold in the future (or a clock skew) would otherwise open on a week
+  // before the floor and immediately disable the button the user needs.
+  useEffect(() => {
+    if (floorWeek && weekDates(weekOf)[0] < floorWeek) setWeekOf(floorWeek)
+  }, [floorWeek])
+
+  // Jump straight to where the readings are — a job that ran last month opens
+  // on an empty current week otherwise, which reads as "broken".
+  const firstEntry = useMemo(() => {
+    const dates = [...new Set((completions || []).map(c => c.entry_date))].sort()
+    return dates[0]
+  }, [completions])
+
+  function shift(days) {
+    const d = new Date(`${weekOf}T00:00:00`)
+    d.setDate(d.getDate() + days)
+    const next = d.toISOString().slice(0, 10)
+    // Clamp at both ends rather than ignoring the click, so a jump from further
+    // out still lands on the boundary week instead of appearing to do nothing.
+    if (floorWeek && weekDates(next)[0] < floorWeek) return setWeekOf(floorWeek)
+    if (weekDates(next)[0] > ceilingWeek) return setWeekOf(ceilingWeek)
+    setWeekOf(next)
+  }
+
+  const btn =
+    'text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent'
+
+  return (
+    <div className="flex items-center gap-2">
+      {firstEntry && (
+        <button type="button" onClick={() => setWeekOf(firstEntry)} className={btn}>
+          Jump to first entry
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => shift(-7)}
+        disabled={atFloor}
+        title={atFloor ? 'This is the week the job was sold — there is nothing before it.' : undefined}
+        className={btn}
+      >
+        ‹ Prev
+      </button>
+      {/* Clicking the range opens the browser's own date picker, so jumping back
+          a few months does not mean clicking Prev twenty times. A transparent
+          date input sits over the text; Chrome only opens the picker when the
+          click lands on the calendar indicator, so the click asks for it.
+          Fixed width, sized to the widest range the calendar can produce
+          (12/28/2026 – 1/3/2027 = 187px), so the buttons never shift. */}
+      <span className="relative w-48 shrink-0 text-center text-xs text-gray-600 tabular-nums whitespace-nowrap rounded hover:bg-gray-50 hover:text-gray-900 transition-colors">
+        {usDate(week[0])} – {usDate(week[6])}
+        <input
+          type="date"
+          aria-label="Jump to a week"
+          title="Pick any date to jump to that week"
+          value={weekOf}
+          min={floorWeek || undefined}
+          max={today()}
+          onClick={e => {
+            try {
+              e.currentTarget.showPicker()
+            } catch {
+              /* older browser — the field is still focusable and typable */
+            }
+          }}
+          onChange={e => {
+            const picked = e.target.value
+            if (!picked) return
+            if (floorWeek && weekDates(picked)[0] < floorWeek) return setWeekOf(floorWeek)
+            if (weekDates(picked)[0] > ceilingWeek) return setWeekOf(ceilingWeek)
+            setWeekOf(picked)
+          }}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        />
+      </span>
+      <button
+        type="button"
+        onClick={() => shift(7)}
+        disabled={atCeiling}
+        title={atCeiling ? 'This is the current week — work cannot be reported before it happens.' : undefined}
+        className={btn}
+      >
+        Next ›
+      </button>
+    </div>
+  )
+}
+
+export function weekBounds(jobStartDate) {
+  return {
+    floorWeek: jobStartDate ? weekDates(String(jobStartDate).slice(0, 10))[0] : null,
+    ceilingWeek: weekDates(today())[0],
+  }
+}
+
 export default function ModuleCompletionGrid({
   jobId,
   modules,
   completions,
   rows,
   onChange,
+  weekOf,
   jobStartDate = null,
 }) {
   const { user } = useAuth()
-  const [weekOf, setWeekOf] = useState(today())
-  // A job sold in the future (or a clock skew) would otherwise open on a week
-  // before the floor and immediately disable the button the user needs.
-  useEffect(() => {
-    if (!jobStartDate) return
-    const floor = weekDates(String(jobStartDate).slice(0, 10))[0]
-    if (weekDates(weekOf)[0] < floor) setWeekOf(floor)
-  }, [jobStartDate])
   const [saving, setSaving] = useState(null)
   const [error, setError] = useState('')
 
   const week = useMemo(() => weekDates(weekOf), [weekOf])
-
-  // A job cannot have progress before it existed, so the week containing the
-  // sold date is the floor — there is nothing to report in the weeks before it
-  // and letting the navigator run backwards forever only wastes clicks.
-  const floorWeek = useMemo(
-    () => (jobStartDate ? weekDates(String(jobStartDate).slice(0, 10))[0] : null),
-    [jobStartDate]
-  )
+  const { floorWeek, ceilingWeek } = useMemo(() => weekBounds(jobStartDate), [jobStartDate])
   const atFloor = floorWeek != null && week[0] <= floorWeek
-
-  // The other end: nobody can report work that has not happened. The current
-  // week is the ceiling, so a reading can never be post-dated into next month.
-  const ceilingWeek = useMemo(() => weekDates(today())[0], [])
   const atCeiling = week[0] >= ceilingWeek
   const earned = useMemo(() => {
     const m = new Map()
     for (const r of rows || []) m.set(r.id, r)
     return m
   }, [rows])
-
-  // Jump straight to where the readings actually are — a job that ran last
-  // month opens on an empty current week otherwise, which reads as "broken".
-  const dataWeeks = useMemo(() => {
-    const dates = [...new Set((completions || []).map(c => c.entry_date))].sort()
-    return { first: dates[0], last: dates[dates.length - 1] }
-  }, [completions])
 
   // The cumulative reading in force on `date` — the latest entry on or before
   // it, which is NOT the same as the cell's own value: a module worked Monday
@@ -189,82 +272,6 @@ export default function ModuleCompletionGrid({
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-100 flex-wrap">
-        <div className="flex items-center gap-2">
-          {dataWeeks.first && (
-            <button
-              type="button"
-              onClick={() => setWeekOf(dataWeeks.first)}
-              className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
-            >
-              Jump to first entry
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => shift(-7)}
-            disabled={atFloor}
-            title={atFloor ? 'This is the week the job was sold — there is nothing before it.' : undefined}
-            className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-          >
-            ‹ Prev
-          </button>
-          {/* Fixed width: the range is 19–22 characters depending on the month
-              and day digits, and letting it size to content shifted the Next
-              button sideways every time the week changed. Sized for the widest
-              case (12/28/2026 – 1/3/2027) and centred, so the buttons hold
-              still and the dates sit apart inside the gap. */}
-          {/* Clicking the range opens the browser's own date picker, so jumping
-              back a few months does not mean clicking Prev twenty times. A
-              transparent date input sits over the text: the picker is native
-              (month and year dropdowns, keyboard support, correct locale) and
-              the text underneath stays exactly as designed.
-              min/max pin it to the same window the arrows obey, and onChange
-              clamps as well — a browser that ignores min/max would otherwise
-              land the grid outside its own bounds. */}
-          <span className="relative w-48 shrink-0 text-center text-xs text-gray-600 tabular-nums whitespace-nowrap rounded hover:bg-gray-50 hover:text-gray-900 transition-colors">
-            {usDate(week[0])} – {usDate(week[6])}
-            <input
-              type="date"
-              aria-label="Jump to a week"
-              title="Pick any date to jump to that week"
-              value={weekOf}
-              min={floorWeek || undefined}
-              max={today()}
-              // Chrome only opens the picker when the click lands on the
-              // calendar indicator, and ours is invisible — so the click has to
-              // ask for it. showPicker() throws if the browser lacks it or the
-              // call is not user-activated; either way the input still works
-              // through the keyboard, so failing quietly is correct.
-              onClick={e => {
-                try {
-                  e.currentTarget.showPicker()
-                } catch {
-                  /* older browser — the field is still focusable and typable */
-                }
-              }}
-              onChange={e => {
-                const picked = e.target.value
-                if (!picked) return
-                if (floorWeek && weekDates(picked)[0] < floorWeek) return setWeekOf(floorWeek)
-                if (weekDates(picked)[0] > ceilingWeek) return setWeekOf(ceilingWeek)
-                setWeekOf(picked)
-              }}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            />
-          </span>
-          <button
-            type="button"
-            onClick={() => shift(7)}
-            disabled={atCeiling}
-            title={atCeiling ? 'This is the current week — work cannot be reported before it happens.' : undefined}
-            className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-          >
-            Next ›
-          </button>
-        </div>
-      </div>
-
       {error && <p className="px-4 py-2 text-xs text-red-600 bg-red-50">{error}</p>}
 
       <div className="overflow-x-auto thin-scroll">
