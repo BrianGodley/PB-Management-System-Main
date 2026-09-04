@@ -659,3 +659,17 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - All ten labels verified at the same pixel offset; the spacer that had aligned the
   single-value columns is gone, since Pair no longer has an extra row to match.
 - Widths rebalanced 7/2/4 for three labelled pairs, one value, three values.
+
+## Summary bar — GLPMD column, no sub-labels, In House on its own row
+
+- All secondary lines removed: "17.5 due by now", "$4,441 due by now", the inline "/MD"
+  figures, "$0 earned so far" and "no markup set". The completion-adjusted comparison still
+  drives the red/green colouring — it is just no longer printed.
+- **Estimated GLPMD / Actual GLPMD** is now its own column. No `inverse`: a higher produced
+  rate is the good outcome, unlike man-days and cost. Reads "not yet known" when no hours
+  are clocked, since there is no produced rate to divide.
+- In House Labor moved to its own full-width row. Four labelled pairs would not fit beside
+  the other groups — "Estimated Labor Cost" and "Estimated Man Days" both truncated at 60%
+  width. Subcontractors and Materials share the row beneath. Verified 0 of 12 labels clipped
+  by comparing scrollWidth against clientWidth rather than by eye.
+- Single-column values centred to match their centred labels.

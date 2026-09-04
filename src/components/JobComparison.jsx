@@ -79,8 +79,6 @@ function Pair({
   inverse = false,
   unknown = false,
   unknownNote,
-  estSub,
-  actSub,
   expected = null,
 }) {
   const display = v => (currency ? fmt(v) : fmtD(v))
@@ -103,7 +101,6 @@ function Pair({
         <div className="min-w-0">
           <p className="text-[10px] font-bold text-gray-300 truncate">{estLabel}</p>
           <p className="text-sm font-bold text-white tabular-nums truncate">{display(est)}</p>
-          {estSub && <p className="text-[10px] text-gray-500 tabular-nums truncate">{estSub}</p>}
         </div>
         <div className="text-right min-w-0">
           <p className="text-[10px] font-bold text-gray-300 truncate">{actLabel}</p>
@@ -114,9 +111,6 @@ function Pair({
           ) : (
             <p className={`text-sm font-bold tabular-nums truncate ${tone}`}>{display(act)}</p>
           )}
-          {actSub && !unknown && (
-            <p className={`text-[10px] tabular-nums truncate ${tone}`}>{actSub}</p>
-          )}
         </div>
       </div>
     </div>
@@ -124,20 +118,19 @@ function Pair({
 }
 
 // A metric with one value — used where estimated and actual are the same thing.
-function Single({ label, value, currency = false, unknown = false, unknownNote, tone = 'text-white', note }) {
+function Single({ label, value, currency = false, unknown = false, unknownNote, tone = 'text-white' }) {
   return (
     <div className="flex-1 min-w-0 px-3 py-1.5">
       <p className="text-[10px] font-bold text-gray-300 text-center truncate">{label}</p>
       {unknown ? (
-        <p className="text-sm font-bold text-gray-500 truncate" title={unknownNote}>
+        <p className="text-sm font-bold text-gray-500 text-center truncate" title={unknownNote}>
           not yet known
         </p>
       ) : (
-        <p className={`text-sm font-bold tabular-nums truncate ${tone}`}>
+        <p className={`text-sm font-bold tabular-nums text-center truncate ${tone}`}>
           {currency ? fmt(value) : fmtD(value)}
         </p>
       )}
-      {note && <p className="text-[10px] text-gray-500 truncate">{note}</p>}
     </div>
   )
 }
@@ -1058,10 +1051,10 @@ export default function JobComparison({ job }) {
               below (no longer frozen). */}
           <div className="flex-1 min-h-0 overflow-y-auto space-y-4 mt-4">
             {/* Summary bar — three groups, mirroring the estimator */}
-            <div className="flex flex-col lg:flex-row gap-3 items-stretch">
+            <div className="flex flex-col gap-3">
               <Group
                 title="In House Labor"
-                grow="lg:flex-[7_1_0%]"
+                grow="w-full"
                 accent={{ text: 'text-blue-700', border: 'border-blue-400/70' }}
               >
                 <Pair
@@ -1071,9 +1064,6 @@ export default function JobComparison({ job }) {
                   act={profit ? profit.actualManDays : c.actManDays}
                   inverse
                   expected={profit ? c.estManDays * profit.jobCompletion : null}
-                  estSub={
-                    profit ? `${(c.estManDays * profit.jobCompletion).toFixed(1)} due by now` : null
-                  }
                 />
                 <Pair
                   estLabel="Estimated Labor Cost"
@@ -1085,7 +1075,6 @@ export default function JobComparison({ job }) {
                   unknown={!profit}
                   unknownNote="Set the crew rate and overtime multiplier in HR → Labor Rates."
                   expected={profit ? profit.elcToDate : null}
-                  estSub={profit ? `${fmt(profit.elcToDate)} due by now` : null}
                 />
                 <Pair
                   estLabel="Estimated GP"
@@ -1096,28 +1085,35 @@ export default function JobComparison({ job }) {
                   unknown={!profit}
                   unknownNote="Set the crew rate and overtime multiplier in HR → Labor Rates."
                   expected={profit ? profit.earned : null}
-                  estSub={glpmde != null ? `${fmt(glpmde)}/MD` : null}
-                  actSub={profit?.glpmda != null ? `${fmt(profit.glpmda)}/MD` : null}
+                />
+                {/* The rate the job is producing at, against the rate it was
+                    sold at — the one figure comparable across jobs of any size.
+                    Higher is better here, so no `inverse`. */}
+                <Pair
+                  estLabel="Estimated GLPMD"
+                  actLabel="Actual GLPMD"
+                  est={glpmde || 0}
+                  act={profit?.glpmda || 0}
+                  currency
+                  unknown={!profit || profit.glpmda == null}
+                  unknownNote="No hours clocked yet, so there is no produced rate to show."
+                  expected={glpmde}
                 />
               </Group>
 
+              <div className="flex flex-col lg:flex-row gap-3 items-stretch">
               <Group
                 title="Subcontractors"
                 grow="lg:flex-[2_1_0%]"
                 accent={{ text: 'text-orange-600', border: 'border-orange-400/70' }}
               >
-                {/* Sub costs are fixed at estimate, so there is no estimated-vs-
-                    actual to draw. The earned note is the only thing that moves. */}
+                {/* Sub cost is fixed at estimate, so profit is the only figure
+                    here that a tracking view can say anything about. */}
                 <Single
                   label="Gross Profit"
                   value={profit ? profit.subTotal : 0}
                   currency
                   tone="text-green-400"
-                  note={
-                    profit && profit.subTotal > 0
-                      ? `${fmt(profit.subEarned)} earned so far`
-                      : undefined
-                  }
                 />
               </Group>
 
@@ -1139,9 +1135,9 @@ export default function JobComparison({ job }) {
                   value={materialGp}
                   currency
                   tone={materialGp > 0 ? 'text-green-400' : 'text-gray-500'}
-                  note={materialGp === 0 ? 'no markup set' : undefined}
                 />
               </Group>
+              </div>
             </div>
 
           {/* The PM's daily completion entry — the one human input the profit
