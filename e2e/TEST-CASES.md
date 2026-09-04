@@ -973,3 +973,14 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - Headers spelled out: Estimated Man Days · Actual Man Days · Difference · Estimated Labor ·
   Actual Labor · Estimated Materials. Body text up to `text-base`.
 - Verified 9 header cells against 9 body cells, table fits 1300px in a 1300px pane.
+
+## Tracking sections — order, naming and breakdown alignment
+
+- Section order and labels: **📈 Progress · 📋 Module Breakdown · 👷 Crew Breakdown ·
+  ⏱ Time Clock**. All four verified rendering their own content.
+- Breakdown table: every column's data centres under its title (measured at 0px offset from
+  each header's centre), and the Difference figures were the one thing left at 11px while
+  the rest grew — now 16px like the others.
+- PROBE NOTE: two false failures while checking. `Completion %` reads as `COMPLETION %` in
+  innerText because the header is uppercased in CSS, and clicking Progress straight after
+  another section needed longer than 1.9s to re-render. Both were the test, not the app.

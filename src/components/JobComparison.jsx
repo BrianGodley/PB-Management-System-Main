@@ -223,8 +223,8 @@ function ModuleTable({ workOrders, crewMap, profitRows }) {
 
   // A reference table people read across, so it carries a size up from the
   // 10px/14px the denser panels use.
-  const thCls = 'px-3 py-2.5 text-left text-xs font-bold text-gray-600 uppercase tracking-wide'
-  const tdCls = 'px-3 py-2.5 text-base text-gray-700'
+  const thCls = 'px-3 py-2.5 text-center text-xs font-bold text-gray-600 uppercase tracking-wide'
+  const tdCls = 'px-3 py-2.5 text-base text-gray-700 text-center'
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -240,12 +240,12 @@ function ModuleTable({ workOrders, crewMap, profitRows }) {
               <th className={thCls}>Module</th>
               <th className={thCls}>Assigned Crew</th>
               <th className={thCls}>Crew Type</th>
-              <th className={`${thCls} text-right`}>Estimated Man Days</th>
-              <th className={`${thCls} text-right`}>Actual Man Days</th>
-              <th className={`${thCls} text-right`}>Difference</th>
-              <th className={`${thCls} text-right`}>Estimated Labor</th>
-              <th className={`${thCls} text-right`}>Actual Labor</th>
-              <th className={`${thCls} text-right`}>Estimated Materials</th>
+              <th className={thCls}>Estimated Man Days</th>
+              <th className={thCls}>Actual Man Days</th>
+              <th className={thCls}>Difference</th>
+              <th className={thCls}>Estimated Labor</th>
+              <th className={thCls}>Actual Labor</th>
+              <th className={thCls}>Estimated Materials</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -264,7 +264,7 @@ function ModuleTable({ workOrders, crewMap, profitRows }) {
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td className="px-3 py-2.5 text-center">
                     {crew ? (
                       <span className="text-sm font-bold bg-green-100 text-green-800 px-2.5 py-1 rounded-md whitespace-nowrap">
                         👷 Crew {crew.label}
@@ -282,52 +282,52 @@ function ModuleTable({ workOrders, crewMap, profitRows }) {
                       {wo.crew_type || '—'}
                     </span>
                   </td>
-                  <td className={`${tdCls} text-right font-mono`}>
+                  <td className={`${tdCls} font-mono`}>
                     {estMD > 0 ? fmtD(estMD) : '—'}
                   </td>
                   <td
-                    className={`${tdCls} text-right font-mono ${actMD ? 'text-blue-700 font-semibold' : 'text-gray-400'}`}
+                    className={`${tdCls} font-mono ${actMD ? 'text-blue-700 font-semibold' : 'text-gray-400'}`}
                   >
                     {actMD == null ? '—' : fmtD(actMD)}
                   </td>
-                  <td className="px-3 py-2 text-right">
+                  <td className="px-3 py-2.5 text-center">
                     {mdDelta != null && (estMD > 0 || actMD > 0) && (
                       <span
-                        className={`text-[11px] font-semibold ${Math.abs(mdDelta) < 0.05 ? 'text-gray-400' : mdDelta > 0 ? 'text-red-500' : 'text-green-600'}`}
+                        className={`text-base font-semibold ${Math.abs(mdDelta) < 0.05 ? 'text-gray-400' : mdDelta > 0 ? 'text-red-500' : 'text-green-600'}`}
                       >
                         {mdDelta > 0 ? '+' : ''}
                         {fmtD(mdDelta)}
                       </span>
                     )}
                   </td>
-                  <td className={`${tdCls} text-right`}>{estLab > 0 ? fmt(estLab) : '—'}</td>
+                  <td className={tdCls}>{estLab > 0 ? fmt(estLab) : '—'}</td>
                   <td
-                    className={`${tdCls} text-right ${actLab ? 'font-semibold text-blue-700' : 'text-gray-400'}`}
+                    className={`${tdCls} ${actLab ? 'font-semibold text-blue-700' : 'text-gray-400'}`}
                   >
                     {actLab == null ? '—' : fmt(actLab)}
                   </td>
-                  <td className={`${tdCls} text-right`}>{estMat > 0 ? fmt(estMat) : '—'}</td>
+                  <td className={tdCls}>{estMat > 0 ? fmt(estMat) : '—'}</td>
                 </tr>
               )
             })}
           </tbody>
           <tfoot className="bg-gray-50 border-t-2 border-gray-200 font-semibold">
             <tr>
-              <td className="px-3 py-2 text-base font-bold text-gray-800" colSpan={3}>
+              <td className="px-3 py-2.5 text-base font-bold text-gray-800 text-left" colSpan={3}>
                 Totals
               </td>
-              <td className="px-3 py-2 text-base text-right font-mono">{fmtD(totEstMD)}</td>
-              <td className="px-3 py-2 text-base text-right font-mono text-blue-700">
+              <td className="px-3 py-2.5 text-base text-center font-mono">{fmtD(totEstMD)}</td>
+              <td className="px-3 py-2.5 text-base text-center font-mono text-blue-700">
                 {totActMD > 0 ? fmtD(totActMD) : '—'}
               </td>
-              <td className="px-3 py-2 text-right">
+              <td className="px-3 py-2.5 text-center">
                 <DeltaBadge est={totEstMD} act={totActMD} inverse />
               </td>
-              <td className="px-3 py-2 text-base text-right">{fmt(totEstLab)}</td>
-              <td className="px-3 py-2 text-base text-right text-blue-700">
+              <td className="px-3 py-2.5 text-base text-center">{fmt(totEstLab)}</td>
+              <td className="px-3 py-2.5 text-base text-center text-blue-700">
                 {totActLab > 0 ? fmt(totActLab) : '—'}
               </td>
-              <td className="px-3 py-2 text-base text-right">{fmt(totEstMat)}</td>
+              <td className="px-3 py-2.5 text-base text-center">{fmt(totEstMat)}</td>
             </tr>
           </tfoot>
         </table>
@@ -1251,9 +1251,9 @@ export default function JobComparison({ job }) {
           <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
             {[
               { key: 'progress', label: '📈 Progress' },
-              { key: 'crew', label: '👷 Crew' },
-              { key: 'payroll', label: '⏱ Payroll' },
-              { key: 'breakdown', label: '📋 Breakdown' },
+              { key: 'breakdown', label: '📋 Module Breakdown' },
+              { key: 'crew', label: '👷 Crew Breakdown' },
+              { key: 'payroll', label: '⏱ Time Clock' },
             ].map(t => (
               <button
                 key={t.key}
