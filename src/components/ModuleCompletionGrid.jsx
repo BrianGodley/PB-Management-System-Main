@@ -224,7 +224,7 @@ export default function ModuleCompletionGrid({
               min/max pin it to the same window the arrows obey, and onChange
               clamps as well — a browser that ignores min/max would otherwise
               land the grid outside its own bounds. */}
-          <span className="relative w-52 shrink-0 text-center text-xs text-gray-600 tabular-nums whitespace-nowrap rounded hover:bg-gray-50 hover:text-gray-900 transition-colors">
+          <span className="relative w-48 shrink-0 text-center text-xs text-gray-600 tabular-nums whitespace-nowrap rounded hover:bg-gray-50 hover:text-gray-900 transition-colors">
             {usDate(week[0])} – {usDate(week[6])}
             <input
               type="date"

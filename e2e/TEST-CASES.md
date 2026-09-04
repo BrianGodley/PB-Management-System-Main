@@ -798,3 +798,8 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   picker when the click lands on its calendar indicator, and ours is transparent — the click
   has to call `showPicker()` itself. Wrapped in try/catch: it throws on browsers without it,
   where the field stays focusable and typable, so failing quietly is the right behaviour.
+
+- Range width tightened from `w-52` to `w-48`, pulling Prev and Next 16px closer without
+  reintroducing shift. Sized by MEASURING the widest possible range in the browser
+  (12/28/2026 – 1/3/2027 = 187px) rather than guessing: `w-40` was tried first and
+  overflowed at 160px. Buttons verified stationary at x=687 across four weeks.
