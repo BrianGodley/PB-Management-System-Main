@@ -502,3 +502,22 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   unattributed, never apportioned silently; a crew on several modules in one day splits
   evenly and the row is flagged `apportioned`.
 - Removed `GPSummaryCard.jsx` and `ModuleTrackerRow.jsx`, orphaned by the rebuild.
+
+## Seeded end-to-end profit jobs (staging only)
+
+- `scripts/seed-test-jobs.py` creates 15 clients Test Tester1–15, each with a sold estimate
+  (2 projects × 3 modules of different types), a job, 6 work orders each with a crew, 6
+  schedule items, time entries for every crew member every day, and uneven daily completion
+  readings landing on 100%. Split 5/5/5 across finishing faster / on estimate / over.
+  Guards the staging project ref, scoped to `^Test Tester[0-9]+$`, and re-runnable.
+- `scripts/report-test-jobs.mjs` runs the SHIPPED `src/lib/jobProfit.js` over that data and
+  asserts nine properties. Importing the real engine is the point — a green report is
+  evidence about the code that runs in the app, not a reimplementation.
+- Two failures on the first run were BOTH seeding faults, not engine faults, and are worth
+  recording: time entries of 07:00–16:00 are NINE hours, so every ordinary day generated
+  8 standard + 1 overtime and inflated cost on all 15 jobs; and `round(man_days / crew_size)`
+  biased every job upward to whole crew-days. Fixed by an 8-hour day (07:00–15:00) and by
+  shortening the final day so total man-days hit the scenario target.
+- Result: faster jobs return +$1,544 to +$2,036 over GLPE, on-estimate jobs land within
+  0.1%, over jobs return −$2,902 to −$3,634, GLPMDA spans $224–$734 against GLPMDE of
+  $400–$550, and 100% of hours resolve to a module through the work order chain.
