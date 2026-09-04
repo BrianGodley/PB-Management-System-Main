@@ -291,7 +291,7 @@ export default function ModuleCompletionGrid({
               <th />
             </tr>
             <tr className="text-left text-[10px] text-black uppercase tracking-wide border-b border-gray-100">
-              <th className="py-2 px-4 font-bold">Module</th>
+              <th className="py-2 px-4 font-bold text-left">Module</th>
               {week.map((d, i) => (
                 <th key={d} className="py-2 px-1 text-center font-bold text-[20px] leading-tight">
                   {DAY_NAMES[i]}
@@ -308,7 +308,7 @@ export default function ModuleCompletionGrid({
               const row = earned.get(m.id)
               return (
                 <tr key={m.id} className="border-b border-gray-50 last:border-0">
-                  <td className="py-2 px-4">
+                  <td className="py-2 px-4 text-left">
                     <span className="text-base font-semibold text-gray-800">
                       {m.module_name || m.module_type}
                     </span>
@@ -342,7 +342,7 @@ export default function ModuleCompletionGrid({
                   })}
                   <td className="py-2 px-4 text-center">
                     <span
-                      className={`text-sm font-bold ${
+                      className={`text-lg font-bold ${
                         !row || row.completionPct === 0
                           ? 'text-gray-300'
                           : row.completionPct >= 1

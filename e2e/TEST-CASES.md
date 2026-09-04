@@ -1016,3 +1016,14 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   table still fits its pane at 1300px.
 - Tester1 totals: 37.4 → 30.4 MD (▼7.0, 19%) and $9,470 → $7,707 (▼$1,762, 19%) — the two
   deltas agree in percentage, as they must when both sides use one rate.
+
+## Crew Breakdown shares the Module Breakdown table
+
+- Crew Breakdown now renders the SAME `ModuleTable` with a `crewFirst` flag: Assigned Crew
+  leads, rows sort by crew then module, everything else identical. Both views verified
+  showing the same totals (Tester1: 37.4→30.4 MD, $9,470→$7,707).
+- `CrewSection` (196 lines) and `crewGroups` deleted. Two components rendering the same data
+  is how the schedule-vs-clock mismatch survived in the crew panels after the breakdown was
+  fixed; one component makes that impossible.
+- Progress grid: completion percentage up to 18px, module names pinned left (measured: all
+  six start at the same x).
