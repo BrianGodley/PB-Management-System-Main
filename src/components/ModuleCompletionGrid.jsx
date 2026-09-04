@@ -364,12 +364,7 @@ export default function ModuleCompletionGrid({
                 estimated profit. Modules run in sequence and sometimes overlap;
                 this is the line that shows the job as a whole marching to 100%. */}
             <tr className="bg-gray-50 border-t-2 border-gray-200">
-              <td className="py-2 px-4 font-bold text-gray-700">
-                Total Job Gross Profit Earned
-                <span className="block text-[11px] font-normal text-gray-400">
-                  weighted by estimated profit
-                </span>
-              </td>
+              <td className="py-2 px-4 font-bold text-gray-700">Total Job Gross Profit Earned</td>
               {week.map(d => {
                 const cum = jobCumAt(d)
                 const delta = cum - jobCumAt(prevDay(d))

@@ -803,3 +803,11 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   reintroducing shift. Sized by MEASURING the widest possible range in the browser
   (12/28/2026 – 1/3/2027 = 187px) rather than guessing: `w-40` was tried first and
   overflowed at 160px. Buttons verified stationary at x=687 across four weeks.
+
+## Completion grid — summary row title
+
+- "Job total / weighted by estimated profit" became **Total Job Gross Profit Earned**, with
+  the explanatory sub-line dropped. The row reports money banked, not a count of modules.
+  The weighting is unchanged: each module's percentage is scaled by its estimated gross
+  profit, so on Test Active1 the row reads 48% ($7,454 of $15,555) where a plain average of
+  the six module percentages would have said 42.5%.
