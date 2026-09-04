@@ -191,7 +191,7 @@ export default function ModuleCompletionGrid({
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-100 flex-wrap">
+      <div className="relative flex items-center gap-3 px-4 py-2.5 border-b border-gray-100 flex-wrap">
         <div className="flex items-center gap-2">
           {dataWeeks.first && (
             <button
@@ -224,10 +224,11 @@ export default function ModuleCompletionGrid({
             Next ›
           </button>
         </div>
-        {/* Centred in the row, so it reads as a heading over the day columns
-            rather than a caption crowding the date range. */}
-        <p className="flex-1 text-center text-base font-semibold text-gray-700">
-          {atFloor ? 'Job sold this week' : atCeiling ? 'Current week' : ''}
+        {/* Absolutely centred on the ROW, not on the space left over beside the
+            controls — flex-1 text-center pushed it right of the day columns by
+            however wide the buttons happened to be. */}
+        <p className="absolute left-1/2 -translate-x-1/2 text-base font-semibold text-gray-700 pointer-events-none">
+          {atCeiling ? 'Current Week' : atFloor ? 'Job Sold This Week' : 'Previous Week'}
         </p>
       </div>
 
@@ -246,7 +247,7 @@ export default function ModuleCompletionGrid({
                   </span>
                 </th>
               ))}
-              <th className="py-2 px-4 text-center font-bold">GP Earned</th>
+              <th className="py-2 px-4 text-center font-bold">Total GP Earned</th>
               <th className="py-2 px-4 text-center font-bold">Complete</th>
             </tr>
           </thead>

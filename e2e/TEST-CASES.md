@@ -762,3 +762,14 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   headings (module rows and the job total alike). Previously both were right-aligned, so the
   figures drifted away from the titles above them.
 - "GP earned" retitled "GP Earned" for consistency with the other headings.
+
+## Completion grid — week naming and label centring
+
+- "GP Earned" retitled **Total GP Earned**.
+- The week label is now absolutely centred on the ROW. `flex-1 text-center` centred it in
+  whatever space was left beside the buttons, which pushed it right of the day columns by
+  however wide those buttons happened to be. Measured at 7px from the day columns' midpoint
+  on a 1310px row, against a visible offset before.
+- Every week is named now, not just the two boundaries: **Current Week** at the ceiling,
+  **Job Sold This Week** at the floor, **Previous Week** for anything between. All three
+  verified by navigating in the browser.
