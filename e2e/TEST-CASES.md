@@ -914,3 +914,21 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   match missed and the old `laborRate` prop stayed. The build passed and the page rendered —
   the only symptom was em dashes where numbers belonged. Worth re-grepping a call site after
   a formatter runs.
+
+## Delta direction, and payroll figures on one source
+
+- `DeltaBadge`'s `inverse` test was backwards: `over = inverse ? delta < 0 : delta > 0`
+  painted a job SEVEN man days UNDER estimate red, and one running over green. Now
+  `bad = inverse ? delta > 0 : delta < 0`. Verified: Tester1 (−7.0 MD) green, Tester11
+  (+14.4 MD) red.
+- PayrollPanel and the payroll info bar computed hours with a local `diffMins`, which
+  ignores `bt_break_time` and the `bt_hours_regular`/`bt_hours_overtime` fields that imported
+  BuilderTrend rows carry INSTEAD of clock times — so on real historical data they would read
+  differently from the engine. Both now call `splitHours()`.
+- Payroll overtime was measured against SCHEDULED man days, not per person per day: a crew of
+  three working one 8-hour day showed 24h against an 8h "standard" and reported 16h of
+  overtime that never happened. "Standard" now means the non-overtime half of what was
+  clocked.
+- The panel and the bar both print man days beside the hours so the figure can be checked at
+  a glance. Verified across three jobs — bar, breakdown and payroll agree exactly:
+  Tester1 30.4 · Active5 19.9 · Tester11 53.6.

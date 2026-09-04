@@ -1,6 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
-import { resolveRates, jobProfitAsOf, attributeHoursByModule, weekDates } from '../lib/jobProfit'
+import {
+  resolveRates,
+  jobProfitAsOf,
+  attributeHoursByModule,
+  splitHours,
+  weekDates,
+} from '../lib/jobProfit'
 import ModuleCompletionGrid, { WeekPicker, weekBounds } from './ModuleCompletionGrid'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,8 +48,11 @@ function DeltaBadge({ est, act, currency = false, inverse = false }) {
   if (est == null || act == null) return null
   const delta = act - est
   const pct = est !== 0 ? (delta / Math.abs(est)) * 100 : null
-  const over = inverse ? delta < 0 : delta > 0
-  const color = delta === 0 ? 'text-gray-400' : over ? 'text-red-600' : 'text-green-600'
+  // `inverse` marks a metric where spending LESS is the good outcome — man days,
+  // labour cost. The test was the wrong way round, so a job that came in seven
+  // man days UNDER estimate was painted red, and one that ran over was green.
+  const bad = inverse ? delta > 0 : delta < 0
+  const color = delta === 0 ? 'text-gray-400' : bad ? 'text-red-600' : 'text-green-600'
   const arrow = delta === 0 ? '—' : delta > 0 ? '▲' : '▼'
   return (
     <span className={`text-[11px] font-semibold ${color}`}>
@@ -363,11 +372,19 @@ function PayrollPanel({ timeEntries, scheduledManDays }) {
     if (!byDate[e.date]) byDate[e.date] = []
     byDate[e.date].push(e)
   }
-  const totalPayrollMins = timeEntries.reduce((s, e) => s + diffMins(e.time_in, e.time_out), 0)
-  const totalPayrollHrs = totalPayrollMins / 60
-  const standardHrs = scheduledManDays * 8
-  const overtimeHrs = Math.max(0, totalPayrollHrs - standardHrs)
+  // Through the engine, so this panel, the summary bar and the breakdown table
+  // all report the same hours. Its own arithmetic diverged twice: diffMins
+  // ignores bt_break_time and the bt_hours_regular/overtime fields that imported
+  // rows carry instead of clock times, and overtime was measured against
+  // SCHEDULED man days rather than per person per day — a crew of three working
+  // one eight-hour day showed 24h against an 8h standard and reported 16h of
+  // overtime that never happened.
+  const hours = splitHours(timeEntries)
+  const totalPayrollHrs = hours.total
+  const standardHrs = hours.standard
+  const overtimeHrs = hours.overtime
   const overtimeMD = overtimeHrs / 8
+  const totalMD = totalPayrollHrs / 8
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -380,7 +397,7 @@ function PayrollPanel({ timeEntries, scheduledManDays }) {
             Payroll Records
           </span>
           <span className="text-[10px] font-semibold bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-            {fmtH(totalPayrollHrs)} total
+            {fmtH(totalPayrollHrs)} total · {fmtD(totalMD)} MD
           </span>
           {overtimeHrs > 0.1 && (
             <span className="text-[10px] font-semibold bg-red-50 text-red-600 px-2 py-0.5 rounded">
@@ -972,10 +989,12 @@ export default function JobComparison({ job }) {
     }, 0)
 
     // ACTUAL — payroll hours (from time_entries)
-    const payrollMins = timeEntries.reduce((s, e) => s + diffMins(e.time_in, e.time_out), 0)
-    const payrollHours = payrollMins / 60
-    const standardHours = scheduledManDays * 8
-    const overtimeHours = Math.max(0, payrollHours - standardHours)
+    // Same engine call as the panel and the bar — see PayrollPanel for why this
+    // is not computed locally.
+    const clocked = splitHours(timeEntries)
+    const payrollHours = clocked.total
+    const standardHours = clocked.standard
+    const overtimeHours = clocked.overtime
     const overtimeManDays = overtimeHours / 8
     const actManDays = scheduledManDays + overtimeManDays
 
@@ -996,6 +1015,7 @@ export default function JobComparison({ job }) {
       estGPPct,
       scheduledManDays,
       payrollHours,
+      standardHours,
       overtimeHours,
       overtimeManDays,
       actManDays,
@@ -1275,9 +1295,13 @@ export default function JobComparison({ job }) {
         {section === 'payroll' && c.payrollHours > 0 && (
           <div className="flex flex-wrap gap-3 px-4 py-2.5 bg-blue-50 rounded-xl border border-blue-100 text-sm">
             <span className="text-blue-700 font-semibold">⏱ Payroll:</span>
-            <span className="text-gray-700">{c.payrollHours.toFixed(1)}h clocked</span>
+            <span className="text-gray-700">
+              {c.payrollHours.toFixed(1)}h clocked · {(c.payrollHours / 8).toFixed(2)} MD
+            </span>
             <span className="text-gray-400">·</span>
-            <span className="text-gray-700">{(c.scheduledManDays * 8).toFixed(0)}h standard</span>
+            {/* "standard" is the non-overtime half of what was CLOCKED. It used
+                to show scheduled hours, which is a different quantity entirely. */}
+            <span className="text-gray-700">{c.standardHours.toFixed(1)}h standard</span>
             {c.overtimeHours > 0.1 && (
               <>
                 <span className="text-gray-400">·</span>
