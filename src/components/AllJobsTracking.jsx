@@ -195,7 +195,7 @@ export default function AllJobsTracking({ jobs = [], statusFilter = 'open', onSe
       ? trackedRows.reduce((s, r) => s + r.pctComplete * r.estMD, 0) / totals.estMD
       : 0
 
-  const th = 'px-3 py-2.5 text-center text-xs font-bold text-gray-600 uppercase tracking-wide'
+  const th = 'px-3 py-2.5 text-center text-xs font-bold text-gray-600 tracking-wide'
   const td = 'px-3 py-2.5 text-base text-center text-gray-700'
   // Spending less is the good outcome for days and cost; more is better for profit.
   const tone = (act, est, inverse) => {
@@ -216,8 +216,8 @@ export default function AllJobsTracking({ jobs = [], statusFilter = 'open', onSe
     <div className="flex flex-col h-full">
       {!rates && (
         <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
-          Labour rates are not set, so actuals cannot be calculated. Set the crew rate and
-          overtime multiplier in HR → Labor Rates.
+          Labour rates are not set, so actuals cannot be calculated. Set the crew rate and overtime
+          multiplier in HR → Labor Rates.
         </div>
       )}
 
@@ -232,15 +232,15 @@ export default function AllJobsTracking({ jobs = [], statusFilter = 'open', onSe
             <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className={`${th} text-left`}>Job</th>
-                <th className={th}>Estimated Man Days</th>
-                <th className={th}>Actual Man Days</th>
-                <th className={th}>Estimated Labor</th>
-                <th className={th}>Actual Labor</th>
-                <th className={th}>Estimated Gross Profit</th>
-                <th className={th}>Actual Gross Profit</th>
+                <th className={th}>Estimated man days</th>
+                <th className={th}>Actual man days</th>
+                <th className={th}>Estimated labor</th>
+                <th className={th}>Actual labor</th>
+                <th className={th}>Estimated gross profit</th>
+                <th className={th}>Actual gross profit</th>
                 <th className={th}>Estimated GLPMD</th>
                 <th className={th}>Actual GLPMD</th>
-                <th className={th}>Sub Gross Profit</th>
+                <th className={th}>Sub gross profit</th>
                 <th className={th}>Completion %</th>
               </tr>
             </thead>
@@ -303,7 +303,9 @@ export default function AllJobsTracking({ jobs = [], statusFilter = 'open', onSe
                   </span>
                 </td>
                 <td className={`${td} font-mono font-bold`}>{md(totals.estMD)}</td>
-                <td className={`${td} font-mono font-bold ${tone(totals.actMD, totals.estMD, true)}`}>
+                <td
+                  className={`${td} font-mono font-bold ${tone(totals.actMD, totals.estMD, true)}`}
+                >
                   {md(totals.actMD)}
                 </td>
                 <td className={`${td} font-bold`}>{money(totals.estLabor)}</td>
@@ -319,9 +321,7 @@ export default function AllJobsTracking({ jobs = [], statusFilter = 'open', onSe
                   {totals.actMD > 0 ? money(totals.actGP / totals.actMD) : '—'}
                 </td>
                 <td className={`${td} font-bold`}>{money(totals.subGP)}</td>
-                <td className={`${td} font-bold text-gray-800`}>
-                  {Math.round(totalPct * 100)}%
-                </td>
+                <td className={`${td} font-bold text-gray-800`}>{Math.round(totalPct * 100)}%</td>
               </tr>
             </tfoot>
           </table>
