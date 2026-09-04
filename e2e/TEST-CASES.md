@@ -531,3 +531,30 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   (a PM opens and links to it directly); the other three are in-page panels, addressable as
   `?tab=<key>` so a tab is linkable from the tracker and survives a refresh.
 - The redundant green button is gone — one discoverable path, not two.
+
+## Tracking tab — real gross profit, and the PM completion grid
+
+- The Tracking tab (`JobComparison`) is the job workspace people actually use. Two other job
+  views existed — `pages/JobDetail.jsx` (`/jobs/:id`) and `pages/JobTracker.jsx`
+  (`/jobs/:id/tracker`) — both reading the legacy `projects`/`modules` tables that hold 0
+  modules in production. Both are DELETED, along with their routes, the "Full View" and
+  tracker buttons on the job header, and `JobTabs`. `NewJob` now redirects to `/jobs`.
+- BUG FIXED, and it was a big one: the Gross Profit card computed `revenue − cost` with
+  actual material cost taken from linked bills. With no bills linked it booked the ENTIRE
+  unspent material budget as profit. Test Tester1 reported $65,269 actual against $38,166
+  estimated on a job that used MORE labour than estimated — overstated by $30,011, exactly
+  the material budget. Median bill lag is 8 days and the 90th percentile is 308, so nearly
+  every open job was affected.
+- The card now shows gross profit PRODUCED from `lib/jobProfit.js` — labour + sub only,
+  driven by completion readings and the timeclock — with GLPMDE → GLPMDA underneath.
+  Materials are deliberately excluded: material profit is only knowable when the last bill
+  lands.
+- SECOND BUG, caught on the screenshot: the card compared a labour-only estimate against a
+  labour+sub actual, inventing a gain equal to the sub GP. Tester1 read +$5,571 when the
+  real figure is +$1,763. Both sides now count the same things.
+- Man Days "actual" was SCHEDULED man-days; it now reports clocked (30.4 vs the 39
+  scheduled for Tester1), with scheduled and overtime shown underneath.
+- `ModuleCompletionGrid` is mounted in the tab: a row per module, Sun–Sat columns, cumulative
+  percent entry, plus Complete % and GP earned per module. A "Jump to first entry" button
+  goes to the first week with readings, since a job that ran last month opens on an empty
+  current week otherwise.

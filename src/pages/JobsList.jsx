@@ -3067,18 +3067,6 @@ function JobDetail({ job, onDelete, price, onEdit }) {
           <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${statusInfo.cls}`}>
             {statusInfo.label}
           </span>
-          <Link
-            to={`/jobs/${job.id}`}
-            className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
-          >
-            Full View
-          </Link>
-          <Link
-            to={`/jobs/${job.id}/tracker`}
-            className="text-xs px-2.5 py-1.5 rounded-lg bg-green-700 text-white hover:bg-green-800 transition-colors"
-          >
-            Track
-          </Link>
           <button
             onClick={() => onDelete(job.id, job.name || job.client_name)}
             className="text-xs px-2 py-1.5 rounded-lg border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"

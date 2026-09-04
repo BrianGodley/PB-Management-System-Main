@@ -1,5 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import {
+  resolveRates,
+  jobProfitAsOf,
+  attributeHoursByModule,
+  weekDates,
+} from '../lib/jobProfit'
+import ModuleCompletionGrid from './ModuleCompletionGrid'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -74,23 +81,51 @@ function KpiCard({ label, est, act, currency = false }) {
   )
 }
 
-function GpCard({ estGP, actGP, estPct, actPct }) {
+// Gross profit PRODUCED — labour + subcontractor, driven by the PM's completion
+// readings and the timeclock. Materials are excluded on purpose: material profit
+// is only knowable when the last bill lands, and counting an unspent budget as
+// profit is exactly the error this card used to make.
+function GpCard({ profit, glpeTotal, glpmde, unavailable }) {
+  if (unavailable) {
+    return (
+      <div className="bg-white rounded-xl border-2 border-amber-300 px-3 py-2 flex flex-col gap-0.5">
+        <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">
+          Gross Profit
+        </span>
+        <p className="text-xs text-amber-800 mt-1 leading-snug">
+          Set the crew rate and overtime multiplier in HR → Labor Rates. No default is
+          assumed.
+        </p>
+      </div>
+    )
+  }
+  // Both sides must count the same things. Actual is labour + sub, so estimated
+  // has to be labour + sub too — comparing GLPE alone against a total that
+  // includes subcontractor profit overstates the gain by the sub GP.
+  const actGP = profit.glpa + profit.subEarned
+  const estGP = glpeTotal + profit.subTotal
   const delta = actGP - estGP
-  const color = actGP > estGP ? 'text-green-700' : actGP < estGP ? 'text-red-600' : 'text-gray-500'
-  const trend = actGP > estGP ? '📈' : actGP < estGP ? '📉' : '➡️'
+  const color = delta > 0 ? 'text-green-700' : delta < 0 ? 'text-red-600' : 'text-gray-500'
+  const trend = delta > 0 ? '📈' : delta < 0 ? '📉' : '➡️'
   return (
     <div className="bg-white rounded-xl border-2 border-green-700 px-3 py-2 flex flex-col gap-0.5">
       <span className="text-[10px] font-bold text-green-700 uppercase tracking-wide">
-        Gross Profit {trend}
+        Gross Profit Produced {trend}
       </span>
       <div className="flex items-start justify-between gap-2 mt-0.5">
         <div>
           <p className="text-[10px] text-gray-400">Estimated</p>
           <p className="text-base font-bold text-gray-800">{fmt(estGP)}</p>
+          {glpmde != null && (
+            <p className="text-[10px] text-gray-400">{fmt(glpmde)}/MD</p>
+          )}
         </div>
         <div className="text-right">
           <p className="text-[10px] text-gray-400">Actual</p>
           <p className={`text-base font-bold ${color}`}>{fmt(actGP)}</p>
+          {profit.glpmda != null && (
+            <p className={`text-[10px] ${color}`}>{fmt(profit.glpmda)}/MD</p>
+          )}
         </div>
       </div>
     </div>
@@ -766,6 +801,11 @@ export default function JobComparison({ job }) {
   const [invoices, setInvoices] = useState([])
   const [crewMap, setCrewMap] = useState({})
   const [laborRate, setLaborRate] = useState(400)
+  // Gross profit produced needs the estimate baseline, the PM's completion
+  // readings, and the burdened hourly rate — none of which this page read before.
+  const [estModules, setEstModules] = useState([])
+  const [completions, setCompletions] = useState([])
+  const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -774,7 +814,8 @@ export default function JobComparison({ job }) {
 
   async function fetchAll() {
     setLoading(true)
-    const [woRes, siRes, teRes, billRes, invRes, crewRes, settingsRes] = await Promise.all([
+    const [woRes, siRes, teRes, billRes, invRes, crewRes, settingsRes, projRes, compRes] =
+      await Promise.all([
       supabase.from('work_orders').select('*').eq('job_id', job.id).order('module_type'),
       supabase.from('schedule_items').select('*').eq('job_id', job.id).order('start_date'),
       supabase.from('time_entries').select('*').eq('job_id', job.id).order('date').order('time_in'),
@@ -789,7 +830,14 @@ export default function JobComparison({ job }) {
         .eq('job_id', job.id)
         .order('date', { ascending: false }),
       supabase.from('crews').select('*').order('label'),
-      supabase.from('company_settings').select('labor_rate_per_man_day').maybeSingle(),
+      supabase.from('company_settings').select('*').maybeSingle(),
+      job.estimate_id
+        ? supabase
+            .from('estimate_projects')
+            .select('id, project_name, estimate_modules ( * )')
+            .eq('estimate_id', job.estimate_id)
+        : Promise.resolve({ data: [] }),
+      supabase.from('module_completion').select('*').eq('job_id', job.id),
     ])
 
     setWorkOrders(woRes.data || [])
@@ -801,6 +849,15 @@ export default function JobComparison({ job }) {
     if (settingsRes.data?.labor_rate_per_man_day) {
       setLaborRate(parseFloat(settingsRes.data.labor_rate_per_man_day) || 400)
     }
+    setSettings(settingsRes.data || null)
+    const flatModules = []
+    for (const p of projRes.data || []) {
+      for (const m of p.estimate_modules || []) {
+        flatModules.push({ ...m, project_name: p.project_name })
+      }
+    }
+    setEstModules(flatModules)
+    setCompletions(compRes.data || [])
     setLoading(false)
   }
 
@@ -839,10 +896,6 @@ export default function JobComparison({ job }) {
     const actLaborCost = actManDays * laborRate
     const actRevenue =
       invoices.length > 0 ? invoices.reduce((s, i) => s + nv(i.amount_paid), 0) : estRevenue // fall back to contract price if no invoices yet
-    const actSubCost = 0 // sub costs tracked through bills
-    const actTotalCost = actLaborCost + actMaterialCost + actSubCost
-    const actGP = actRevenue - actTotalCost
-    const actGPPct = actRevenue > 0 ? (actGP / actRevenue) * 100 : 0
 
     return {
       estManDays,
@@ -861,11 +914,44 @@ export default function JobComparison({ job }) {
       actMaterialCost,
       actLaborCost,
       actRevenue,
-      actTotalCost,
-      actGP,
-      actGPPct,
     }
   }, [workOrders, scheduleItems, timeEntries, bills, invoices, crewMap, laborRate, job])
+
+  // ─── Gross profit produced ────────────────────────────────────────────────
+  // Deliberately NOT revenue − cost. That formula booked the entire unspent
+  // material budget as profit whenever bills had not landed yet, which on a
+  // typical job overstated gross profit by tens of thousands. Profit is now
+  // what the finished work is worth, less what it cost extra to get there:
+  //   GLPA = (CP × GLPE) − (RLC − CP × ELC_total)
+  // computed by the same engine the unit tests cover.
+  const rates = useMemo(() => resolveRates(settings), [settings])
+  const attribution = useMemo(
+    () =>
+      attributeHoursByModule({
+        timeEntries,
+        scheduleItems,
+        workOrders,
+        crews: Object.values(crewMap),
+      }),
+    [timeEntries, scheduleItems, workOrders, crewMap]
+  )
+  const profit = useMemo(
+    () =>
+      rates
+        ? jobProfitAsOf({
+            modules: estModules,
+            completions,
+            timeEntries,
+            rates,
+            attribution,
+          })
+        : null,
+    [estModules, completions, timeEntries, rates, attribution]
+  )
+  const glpmde = useMemo(() => {
+    const emd = estModules.reduce((s, m) => s + nv(m.man_days), 0)
+    return profit && emd > 0 ? profit.glpeTotal / emd : null
+  }, [estModules, profit])
 
   // ─── By-crew grouping ──────────────────────────────────────────────────────
   const crewGroups = useMemo(() => {
@@ -937,14 +1023,12 @@ export default function JobComparison({ job }) {
             <KpiCard
               label="Man Days"
               est={c.estManDays}
-              act={c.actManDays}
+              act={profit ? profit.actualManDays : c.actManDays}
               inverse
               sub={
-                c.overtimeManDays > 0.1
-                  ? `Incl. ${c.overtimeManDays.toFixed(1)} MD overtime`
-                  : c.scheduledManDays > 0
-                    ? `${c.scheduledManDays.toFixed(1)} scheduled`
-                    : undefined
+                profit
+                  ? `${c.scheduledManDays.toFixed(1)} scheduled · ${(profit.hours.overtime / 8).toFixed(1)} MD overtime`
+                  : `${c.scheduledManDays.toFixed(1)} scheduled`
               }
             />
             <KpiCard
@@ -967,8 +1051,24 @@ export default function JobComparison({ job }) {
                   : 'No bills recorded yet'
               }
             />
-            <GpCard estGP={c.estGP} actGP={c.actGP} estPct={c.estGPPct} actPct={c.actGPPct} />
+            <GpCard
+              profit={profit}
+              glpeTotal={profit?.glpeTotal || 0}
+              glpmde={glpmde}
+              unavailable={!profit}
+            />
           </div>
+
+          {/* The PM's daily completion entry — the one human input the profit
+              figures above depend on. The timeclock says what was spent; only a
+              person can say what was finished. */}
+          <ModuleCompletionGrid
+            jobId={job.id}
+            modules={estModules}
+            completions={completions}
+            rows={profit?.rows || []}
+            onChange={setCompletions}
+          />
 
           {/* Payroll hours info row */}
           {c.payrollHours > 0 && (

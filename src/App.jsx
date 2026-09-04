@@ -43,13 +43,11 @@ const Contacts = lazy(() => import('./pages/Contacts'))
 const ContactDetail = lazy(() => import('./pages/ContactDetail'))
 const CompanyDetail = lazy(() => import('./pages/CompanyDetail'))
 const NewJob = lazy(() => import('./pages/NewJob'))
-const JobDetail = lazy(() => import('./pages/JobDetail'))
 const JobsList = lazy(() => import('./pages/JobsList'))
 const Info = lazy(() => import('./pages/Info'))
 const Design = lazy(() => import('./pages/Design'))
 const DesignDetail = lazy(() => import('./pages/DesignDetail'))
 const Bids = lazy(() => import('./pages/Bids'))
-const JobTracker = lazy(() => import('./pages/JobTracker'))
 const Collections = lazy(() => import('./pages/Collections'))
 const Admin = lazy(() => import('./pages/Admin'))
 const EstimateDetail = lazy(() => import('./pages/EstimateDetail'))
@@ -204,14 +202,11 @@ function AppRoutes() {
           <Route path="jobs" element={<JobsList />} />
           <Route path="info" element={<Info />} />
           <Route path="jobs/new" element={<NewJob />} />
-          <Route path="jobs/:id" element={<JobDetail />} />
-          <Route path="jobs/:id/tracker" element={<JobTracker />} />
           <Route path="estimates/:id" element={<EstimateDetail />} />
           <Route path="bids" element={<Bids />} />
           <Route path="edocuments" element={<EDocuments />} />
           <Route path="workflows" element={<Workflows />} />
           <Route path="customize" element={<Customize />} />
-          <Route path="tracker" element={<JobTracker />} />
           <Route path="collections" element={<Collections />} />
           <Route path="admin" element={<Admin />} />
           <Route path="master-rates" element={<MasterRates />} />

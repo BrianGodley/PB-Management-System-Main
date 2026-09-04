@@ -155,7 +155,8 @@ export default function NewJob() {
         }
       }
 
-      navigate(`/jobs/${job.id}`)
+      // /jobs/:id was retired — the workspace at /jobs holds every job view.
+      navigate('/jobs')
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.')
     } finally {
