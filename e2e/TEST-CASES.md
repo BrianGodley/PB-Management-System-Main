@@ -959,3 +959,17 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   The series now opens from a snapshot of the day BEFORE the window. The weekly total moves
   from $7,811 to the correct $2,260. Regression test added: a window opening at 60% complete
   reports the 10% step, not the 60% balance.
+
+## Breakdown table — scheduled column dropped, crew moved, headers spelled out
+
+- **Sched MD removed.** Scheduled man-days do not help in real time — the plan shifts with
+  completion, absence and overtime, so only the clocked figure means anything. `siByWO` and
+  the whole schedule-derived path removed from `ModuleTable` along with it.
+- **`CrewSection` had the same fault** and was fixed at the same time rather than waiting for
+  it to be reported: it derived actuals from the schedule at `labor_rate_per_man_day`. Both
+  panels now read the engine. Verified the crew panels sum to the bar's 30.4 MD on Tester1.
+- Assigned Crew moved to sit right after Module, and its chip (plus the crew type chip)
+  enlarged to `text-sm` with real padding.
+- Headers spelled out: Estimated Man Days · Actual Man Days · Difference · Estimated Labor ·
+  Actual Labor · Estimated Materials. Body text up to `text-base`.
+- Verified 9 header cells against 9 body cells, table fits 1300px in a 1300px pane.

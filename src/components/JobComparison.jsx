@@ -195,18 +195,7 @@ function Group({ title, accent, grow, children }) {
 // on Test Tester1 that read 39.0 scheduled MD at $317.36 = $12,377 against the
 // bar's 30.4 clocked MD at $253.20 = $7,707. Scheduled days are still shown —
 // they are a real and different fact — but ACTUAL now means clocked, everywhere.
-function ModuleTable({ workOrders, scheduleItems, crewMap, profitRows }) {
-  const siByWO = useMemo(() => {
-    const m = {}
-    for (const item of scheduleItems) {
-      for (const woId of item.work_order_ids || []) {
-        if (!m[woId]) m[woId] = []
-        m[woId].push(item)
-      }
-    }
-    return m
-  }, [scheduleItems])
-
+function ModuleTable({ workOrders, crewMap, profitRows }) {
   const byModule = useMemo(() => {
     const m = new Map()
     for (const r of profitRows || []) m.set(r.id, r)
@@ -214,11 +203,6 @@ function ModuleTable({ workOrders, scheduleItems, crewMap, profitRows }) {
   }, [profitRows])
 
   const rows = workOrders.map(wo => {
-    const items = siByWO[wo.id] || []
-    const schedMD = items.reduce(
-      (s, it) => s + nv(it.work_days) * crewSizeOf(crewMap[it.crew_id]),
-      0
-    )
     const estMD = nv(wo.man_days)
     const estMat = nv(wo.material_cost) + nv(wo.sub_cost)
     const estLab = nv(wo.labor_cost)
@@ -228,18 +212,19 @@ function ModuleTable({ workOrders, scheduleItems, crewMap, profitRows }) {
     const actMD = pr?.actualManDays ?? null
     const actLab = pr?.rlc ?? null
     const crew = wo.scheduled_crew_id ? crewMap[wo.scheduled_crew_id] : null
-    return { wo, estMD, schedMD, actMD, estMat, estLab, actLab, crew }
+    return { wo, estMD, actMD, estMat, estLab, actLab, crew }
   })
 
   const totEstMD = rows.reduce((s, r) => s + r.estMD, 0)
-  const totSchedMD = rows.reduce((s, r) => s + r.schedMD, 0)
   const totActMD = rows.reduce((s, r) => s + (r.actMD || 0), 0)
   const totEstMat = rows.reduce((s, r) => s + r.estMat, 0)
   const totEstLab = rows.reduce((s, r) => s + r.estLab, 0)
   const totActLab = rows.reduce((s, r) => s + (r.actLab || 0), 0)
 
-  const thCls = 'px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wide'
-  const tdCls = 'px-3 py-2 text-sm text-gray-700'
+  // A reference table people read across, so it carries a size up from the
+  // 10px/14px the denser panels use.
+  const thCls = 'px-3 py-2.5 text-left text-xs font-bold text-gray-600 uppercase tracking-wide'
+  const tdCls = 'px-3 py-2.5 text-base text-gray-700'
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -253,19 +238,18 @@ function ModuleTable({ workOrders, scheduleItems, crewMap, profitRows }) {
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
               <th className={thCls}>Module</th>
-              <th className={thCls}>Crew Type</th>
-              <th className={`${thCls} text-right`}>Est MD</th>
-              <th className={`${thCls} text-right`}>Sched MD</th>
-              <th className={`${thCls} text-right`}>Act MD</th>
-              <th className={`${thCls} text-right`}>Δ MD</th>
-              <th className={`${thCls} text-right`}>Est Labor</th>
-              <th className={`${thCls} text-right`}>Act Labor</th>
-              <th className={`${thCls} text-right`}>Est Mat</th>
               <th className={thCls}>Assigned Crew</th>
+              <th className={thCls}>Crew Type</th>
+              <th className={`${thCls} text-right`}>Estimated Man Days</th>
+              <th className={`${thCls} text-right`}>Actual Man Days</th>
+              <th className={`${thCls} text-right`}>Difference</th>
+              <th className={`${thCls} text-right`}>Estimated Labor</th>
+              <th className={`${thCls} text-right`}>Actual Labor</th>
+              <th className={`${thCls} text-right`}>Estimated Materials</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {rows.map(({ wo, estMD, schedMD, actMD, estMat, estLab, actLab, crew }) => {
+            {rows.map(({ wo, estMD, actMD, estMat, estLab, actLab, crew }) => {
               const mdDelta = actMD == null ? null : actMD - estMD
               return (
                 <tr key={wo.id} className="hover:bg-gray-50">
@@ -280,18 +264,26 @@ function ModuleTable({ workOrders, scheduleItems, crewMap, profitRows }) {
                       </span>
                     )}
                   </td>
+                  <td className="px-3 py-2.5">
+                    {crew ? (
+                      <span className="text-sm font-bold bg-green-100 text-green-800 px-2.5 py-1 rounded-md whitespace-nowrap">
+                        👷 Crew {crew.label}
+                      </span>
+                    ) : wo.scheduled_crew_id ? (
+                      <span className="text-sm text-gray-400">Loading…</span>
+                    ) : (
+                      <span className="text-sm font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-md whitespace-nowrap">
+                        ⚠ Unassigned
+                      </span>
+                    )}
+                  </td>
                   <td className={tdCls}>
-                    <span className="text-xs bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded font-medium">
+                    <span className="text-sm bg-purple-50 text-purple-700 px-2.5 py-1 rounded-md font-medium whitespace-nowrap">
                       {wo.crew_type || '—'}
                     </span>
                   </td>
                   <td className={`${tdCls} text-right font-mono`}>
                     {estMD > 0 ? fmtD(estMD) : '—'}
-                  </td>
-                  <td
-                    className={`${tdCls} text-right font-mono ${schedMD > 0 ? 'text-gray-600' : 'text-gray-400'}`}
-                  >
-                    {schedMD > 0 ? fmtD(schedMD) : '—'}
                   </td>
                   <td
                     className={`${tdCls} text-right font-mono ${actMD ? 'text-blue-700 font-semibold' : 'text-gray-400'}`}
@@ -315,44 +307,27 @@ function ModuleTable({ workOrders, scheduleItems, crewMap, profitRows }) {
                     {actLab == null ? '—' : fmt(actLab)}
                   </td>
                   <td className={`${tdCls} text-right`}>{estMat > 0 ? fmt(estMat) : '—'}</td>
-                  <td className="px-3 py-2">
-                    {crew ? (
-                      <span className="text-[10px] font-bold bg-green-100 text-green-800 px-1.5 py-0.5 rounded">
-                        👷 Crew {crew.label}
-                      </span>
-                    ) : wo.scheduled_crew_id ? (
-                      <span className="text-[10px] text-gray-400">Loading…</span>
-                    ) : (
-                      <span className="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-                        ⚠ Unassigned
-                      </span>
-                    )}
-                  </td>
                 </tr>
               )
             })}
           </tbody>
           <tfoot className="bg-gray-50 border-t-2 border-gray-200 font-semibold">
             <tr>
-              <td className="px-3 py-2 text-sm font-bold text-gray-800" colSpan={2}>
+              <td className="px-3 py-2 text-base font-bold text-gray-800" colSpan={3}>
                 Totals
               </td>
-              <td className="px-3 py-2 text-sm text-right font-mono">{fmtD(totEstMD)}</td>
-              <td className="px-3 py-2 text-sm text-right font-mono text-gray-600">
-                {totSchedMD > 0 ? fmtD(totSchedMD) : '—'}
-              </td>
-              <td className="px-3 py-2 text-sm text-right font-mono text-blue-700">
+              <td className="px-3 py-2 text-base text-right font-mono">{fmtD(totEstMD)}</td>
+              <td className="px-3 py-2 text-base text-right font-mono text-blue-700">
                 {totActMD > 0 ? fmtD(totActMD) : '—'}
               </td>
               <td className="px-3 py-2 text-right">
                 <DeltaBadge est={totEstMD} act={totActMD} inverse />
               </td>
-              <td className="px-3 py-2 text-sm text-right">{fmt(totEstLab)}</td>
-              <td className="px-3 py-2 text-sm text-right text-blue-700">
+              <td className="px-3 py-2 text-base text-right">{fmt(totEstLab)}</td>
+              <td className="px-3 py-2 text-base text-right text-blue-700">
                 {totActLab > 0 ? fmt(totActLab) : '—'}
               </td>
-              <td className="px-3 py-2 text-sm text-right">{fmt(totEstMat)}</td>
-              <td />
+              <td className="px-3 py-2 text-base text-right">{fmt(totEstMat)}</td>
             </tr>
           </tfoot>
         </table>
@@ -683,27 +658,25 @@ function AccountingPanel({ bills, invoices }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // By-Crew section
 // ─────────────────────────────────────────────────────────────────────────────
-function CrewSection({ crewLabel, workOrders, scheduleItems, crewMap, laborRate, isUnassigned }) {
+// Actuals come from the engine here too — this panel derived them from the
+// schedule at labor_rate_per_man_day, which disagreed with the summary bar and
+// the breakdown table on both the man-day count and the rate.
+function CrewSection({ crewLabel, workOrders, profitRows, isUnassigned }) {
   const [open, setOpen] = useState(true)
 
-  const siByWO = useMemo(() => {
-    const m = {}
-    for (const item of scheduleItems) {
-      for (const woId of item.work_order_ids || []) {
-        if (!m[woId]) m[woId] = []
-        m[woId].push(item)
-      }
-    }
+  const byModule = useMemo(() => {
+    const m = new Map()
+    for (const r of profitRows || []) m.set(r.id, r)
     return m
-  }, [scheduleItems])
+  }, [profitRows])
 
   const rows = workOrders.map(wo => {
-    const items = siByWO[wo.id] || []
-    const actMD = items.reduce((s, it) => s + nv(it.work_days) * crewSizeOf(crewMap[it.crew_id]), 0)
+    const pr = byModule.get(wo.estimate_module_id)
+    const actMD = pr?.actualManDays ?? 0
     const estMD = nv(wo.man_days)
     const estMat = nv(wo.material_cost) + nv(wo.sub_cost)
     const estLab = nv(wo.labor_cost)
-    const actLab = actMD * laborRate
+    const actLab = pr?.rlc ?? 0
     return { wo, estMD, actMD, estMat, estLab, actLab }
   })
 
@@ -734,7 +707,7 @@ function CrewSection({ crewLabel, workOrders, scheduleItems, crewMap, laborRate,
           {totEstMD > 0 && (
             <span className="text-[10px] font-semibold bg-white/60 text-gray-700 px-2 py-0.5 rounded">
               Est {fmtD(totEstMD)}
-              {totActMD > 0 && <span className="text-blue-700"> · Sched {fmtD(totActMD)}</span>}
+              {totActMD > 0 && <span className="text-blue-700"> · Act {fmtD(totActMD)}</span>}
             </span>
           )}
           {mdDelta !== 0 && totActMD > 0 && (
@@ -758,7 +731,7 @@ function CrewSection({ crewLabel, workOrders, scheduleItems, crewMap, laborRate,
                     'Module',
                     'Crew Type',
                     'Est MD',
-                    'Sched MD',
+                    'Act MD',
                     'Δ MD',
                     'Est Labor',
                     'Act Labor',
@@ -766,7 +739,7 @@ function CrewSection({ crewLabel, workOrders, scheduleItems, crewMap, laborRate,
                   ].map(h => (
                     <th
                       key={h}
-                      className={`px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wide ${['Est MD', 'Sched MD', 'Δ MD', 'Est Labor', 'Act Labor', 'Est Mat'].includes(h) ? 'text-right' : 'text-left'}`}
+                      className={`px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wide ${['Est MD', 'Act MD', 'Δ MD', 'Est Labor', 'Act Labor', 'Est Mat'].includes(h) ? 'text-right' : 'text-left'}`}
                     >
                       {h}
                     </th>
@@ -1346,7 +1319,6 @@ export default function JobComparison({ job }) {
         {section === 'breakdown' && workOrders.length > 0 && (
           <ModuleTable
             workOrders={workOrders}
-            scheduleItems={scheduleItems}
             crewMap={crewMap}
             profitRows={profit?.rows || []}
           />
@@ -1366,9 +1338,7 @@ export default function JobComparison({ job }) {
                     crewLabel={crew?.label || crewId.slice(0, 8)}
                     crewColor={crew?.color}
                     workOrders={wos}
-                    scheduleItems={scheduleItems}
-                    crewMap={crewMap}
-                    laborRate={laborRate}
+                    profitRows={profit?.rows || []}
                   />
                 )
               })}
@@ -1378,9 +1348,7 @@ export default function JobComparison({ job }) {
                 key="__unassigned__"
                 crewLabel="Unassigned"
                 workOrders={crewGroups['__unassigned__']}
-                scheduleItems={scheduleItems}
-                crewMap={crewMap}
-                laborRate={laborRate}
+                profitRows={profit?.rows || []}
                 isUnassigned
               />
             )}
