@@ -99,14 +99,17 @@ export default function ModuleCompletionGrid({
   // the number more than finishing a small one — the same weighting the profit
   // engine uses, which is why the row lands on 100% exactly when the job does.
   const gain = (moduleId, date) => cumAt(moduleId, date) - cumAt(moduleId, prevDay(date))
-  const glpeTotal = (modules || []).reduce((sum, m) => sum + (parseFloat(m.gross_profit) || 0), 0)
-  const jobCumAt = date =>
-    glpeTotal > 0
-      ? (modules || []).reduce(
-          (sum, m) => sum + cumAt(m.id, date) * (parseFloat(m.gross_profit) || 0),
-          0
-        ) / glpeTotal
-      : 0
+  // What each module is worth in profit: its labour GP plus the sub GP riding on
+  // it. Both are earned by the same completion percentage, and the row's total
+  // cell already sums both — so the day columns weight by the same figure.
+  const worthOf = m =>
+    (parseFloat(m.gross_profit) || 0) + (parseFloat(m.data?.calc?.subGp) || 0)
+  const glpeTotal = (modules || []).reduce((sum, m) => sum + worthOf(m), 0)
+  // Dollars of profit banked as at a date.
+  const jobEarnedAt = date =>
+    (modules || []).reduce((sum, m) => sum + (cumAt(m.id, date) / 100) * worthOf(m), 0)
+  // The same thing as a share of the job.
+  const jobCumAt = date => (glpeTotal > 0 ? (jobEarnedAt(date) / glpeTotal) * 100 : 0)
 
   const cellValue = (moduleId, date) => {
     const row = (completions || []).find(
@@ -370,7 +373,10 @@ export default function ModuleCompletionGrid({
                 const delta = cum - jobCumAt(prevDay(d))
                 return (
                   <td key={d} className="py-2 px-1 text-center">
-                    <span className="block text-sm font-bold tabular-nums text-gray-800">
+                    <span className="block text-sm font-bold tabular-nums text-green-700">
+                      {fmt(jobEarnedAt(d))}
+                    </span>
+                    <span className="block text-xs tabular-nums text-gray-600">
                       {Math.round(cum)}%
                     </span>
                     <span

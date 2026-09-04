@@ -811,3 +811,12 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   The weighting is unchanged: each module's percentage is scaled by its estimated gross
   profit, so on Test Active1 the row reads 48% ($7,454 of $15,555) where a plain average of
   the six module percentages would have said 42.5%.
+
+## Completion grid — dollars on the summary row
+
+- Each day cell in Total Job Gross Profit Earned now leads with the dollars banked as at
+  that day, with the share and the day's gain beneath: `$7,455 / 45% / +5.7%`.
+- BASIS CHANGE: the day columns previously weighted by labour GP alone while the row's total
+  cell summed labour + sub, so the two would disagree as soon as a module carrying a sub was
+  part-finished. Both now use labour + sub. On Active1 that moves the reading from
+  $7,454 ÷ $15,555 = 48% to $7,455 ÷ $16,741 = 45% — same dollars, larger denominator.
