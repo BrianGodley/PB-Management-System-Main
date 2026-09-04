@@ -234,6 +234,23 @@ test('a real underspend still books its gain', () => {
   assert.equal(r.laborDataMissing, false)
 })
 
+test('the first day of a window reports only THAT day, not the running total', () => {
+  // The window opens on 09-03, by which point 50% is already earned. That day's
+  // production is the step from 50 to 60 — not the whole 60% banked so far.
+  const modules = [mod('m', 10, 4500)]
+  const completions = [cp('m', '2026-09-01', 50), cp('m', '2026-09-03', 60)]
+  const s = dailySeries({
+    modules,
+    completions,
+    timeEntries: [],
+    rates: RATES,
+    dates: ['2026-09-03', '2026-09-04'],
+  })
+  near(s[0].laborProducedToday, 450) // 10% of 4,500, NOT 60% of it
+  near(s[0].laborGp, 2700) // the running total is still the full 60%
+  near(s[1].laborProducedToday, 0)
+})
+
 test('a day with hours but no completion movement produces NEGATIVE profit', () => {
   const modules = [mod('m', 10, 4500)]
   const completions = [cp('m', '2026-09-01', 20)] // no reading on day 2

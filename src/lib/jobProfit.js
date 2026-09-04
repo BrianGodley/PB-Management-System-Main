@@ -370,8 +370,25 @@ export function attributeHoursByModule({
  */
 export function dailySeries({ modules, completions, timeEntries, rates, dates }) {
   if (!rates) return []
-  let prevLabor = 0
-  let prevSub = 0
+  if (!dates?.length) return []
+
+  // Seed the running total from the day BEFORE the window opens. Starting at
+  // zero made the first date report everything earned to that point as if it
+  // were one day's production — a Sunday column showing the whole job to date.
+  const dayBefore = (() => {
+    const d = new Date(`${dates[0]}T00:00:00`)
+    d.setDate(d.getDate() - 1)
+    return d.toISOString().slice(0, 10)
+  })()
+  const opening = jobProfitAsOf({
+    modules,
+    completions,
+    timeEntries,
+    rates,
+    upToDate: dayBefore,
+  })
+  let prevLabor = opening.glpa
+  let prevSub = opening.subEarned
   const out = []
 
   for (const date of dates) {

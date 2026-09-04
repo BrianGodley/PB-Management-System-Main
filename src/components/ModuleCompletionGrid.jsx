@@ -300,7 +300,7 @@ export default function ModuleCompletionGrid({
                   </span>
                 </th>
               ))}
-              <th className="py-2 px-4 text-center font-bold">Complete</th>
+              <th className="py-2 px-4 text-center font-bold">Completion %</th>
             </tr>
           </thead>
           <tbody>
@@ -343,10 +343,14 @@ export default function ModuleCompletionGrid({
                   <td className="py-2 px-4 text-center">
                     <span
                       className={`text-sm font-bold ${
-                        row && row.completionPct >= 1 ? 'text-green-700' : 'text-gray-400'
+                        !row || row.completionPct === 0
+                          ? 'text-gray-300'
+                          : row.completionPct >= 1
+                            ? 'text-green-700'
+                            : 'text-gray-700'
                       }`}
                     >
-                      {row && row.completionPct >= 1 ? 'Yes' : 'No'}
+                      {row ? `${Math.round(row.completionPct * 100)}%` : '—'}
                     </span>
                   </td>
                 </tr>
@@ -357,7 +361,7 @@ export default function ModuleCompletionGrid({
                 this one answers "what did we make on Tuesday?". A day can come
                 out negative when a PM restates an earlier reading downward. */}
             <tr className="bg-gray-50/60 border-t-2 border-gray-200">
-              <td className="py-2 px-4 font-bold text-gray-700">Weekly Job Gross Profit Earned</td>
+              <td className="py-2 px-4 font-bold text-gray-700">Weekly Crew/Sub Gross Profit</td>
               {week.map(d => {
                 const gained = producedOn(d)
                 return (
@@ -381,7 +385,7 @@ export default function ModuleCompletionGrid({
                 estimated profit. Modules run in sequence and sometimes overlap;
                 this is the line that shows the job as a whole marching to 100%. */}
             <tr className="bg-gray-50 border-t border-gray-200">
-              <td className="py-2 px-4 font-bold text-gray-700">Total Job Gross Profit Earned</td>
+              <td className="py-2 px-4 font-bold text-gray-700">Total Crew/Sub Gross Profit</td>
               {week.map(d => (
                 <td key={d} className="py-2 px-1 text-center">
                   <span className="text-sm font-bold tabular-nums text-green-700">

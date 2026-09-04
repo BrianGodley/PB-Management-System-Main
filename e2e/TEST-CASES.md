@@ -947,3 +947,15 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - KNOWN GAP: `sub_cost_change` is subtracted on the card but the engine's series does not
   know about it, so setting one would reopen a difference of that amount. Nothing carries a
   cost change today.
+
+## Progress grid — completion percentage and row naming
+
+- The last column is **Completion %** again, showing each module's percentage rather than
+  Yes/No — grey at 0%, green at 100%.
+- Rows renamed: **Weekly Crew/Sub Gross Profit** and **Total Crew/Sub Gross Profit**.
+- BUG FOUND WHILE VERIFYING: `dailySeries()` started its running total at ZERO, so the first
+  date in any window reported everything earned up to that point as if it were one day's
+  production — Active1's Sunday column read $5,551 (the whole job to date) instead of $0.
+  The series now opens from a snapshot of the day BEFORE the window. The weekly total moves
+  from $7,811 to the correct $2,260. Regression test added: a window opening at 60% complete
+  reports the 10% step, not the 60% balance.
