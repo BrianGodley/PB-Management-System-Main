@@ -16,6 +16,17 @@ import { weekDates } from '../lib/jobProfit'
 // timeclock says what was spent, only a person can say what was finished.
 // ─────────────────────────────────────────────────────────────────────────────
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+// M/D/YYYY and M/D, split from the ISO string rather than parsed into a Date —
+// `new Date('2026-08-30')` is UTC midnight and renders as the 29th west of
+// Greenwich, which would silently shift every column heading by a day.
+const usDate = iso => {
+  const [y, m, d] = String(iso).slice(0, 10).split('-')
+  return `${Number(m)}/${Number(d)}/${y}`
+}
+const usShort = iso => {
+  const [, m, d] = String(iso).slice(0, 10).split('-')
+  return `${Number(m)}/${Number(d)}`
+}
 const today = () => new Date().toISOString().slice(0, 10)
 const fmt = v => `$${Math.round(v || 0).toLocaleString()}`
 
@@ -180,16 +191,7 @@ export default function ModuleCompletionGrid({
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-100 flex-wrap">
-        <div>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
-            Completion by day
-          </p>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Cumulative percent complete per module. Entering 20 after 10 means 10% was produced
-            that day.
-          </p>
-        </div>
+      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-100 flex-wrap">
         <div className="flex items-center gap-2">
           {dataWeeks.first && (
             <button
@@ -210,7 +212,7 @@ export default function ModuleCompletionGrid({
             ‹ Prev
           </button>
           <span className="text-xs text-gray-600 tabular-nums whitespace-nowrap">
-            {week[0]} – {week[6]}
+            {usDate(week[0])} – {usDate(week[6])}
             {atFloor && (
               <span className="block text-[10px] text-gray-400 text-center">job sold this week</span>
             )}
@@ -235,12 +237,14 @@ export default function ModuleCompletionGrid({
       <div className="overflow-x-auto thin-scroll">
         <table className="w-full text-sm min-w-[820px]">
           <thead>
-            <tr className="text-left text-[10px] text-gray-400 uppercase tracking-wide border-b border-gray-100">
+            <tr className="text-left text-[10px] text-black uppercase tracking-wide border-b border-gray-100">
               <th className="py-2 px-4 font-bold">Module</th>
               {week.map((d, i) => (
-                <th key={d} className="py-2 px-1 text-center font-bold">
+                <th key={d} className="py-2 px-1 text-center font-bold text-[20px] leading-tight">
                   {DAY_NAMES[i]}
-                  <span className="block text-[9px] text-gray-300 font-normal">{d.slice(5)}</span>
+                  <span className="block text-[18px] text-black font-normal leading-tight">
+                    {usShort(d)}
+                  </span>
                 </th>
               ))}
               <th className="py-2 px-4 text-right font-bold">Complete</th>

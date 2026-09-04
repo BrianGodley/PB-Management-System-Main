@@ -717,3 +717,17 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   used often, or on jobs carrying several subs.
 - PROD SQL still outstanding for this column along with module_completion and
   company_settings.overtime_multiplier.
+
+## Completion grid — header cleanup
+
+- "Completion by day" and its explanatory line removed; the week chooser moved to the left
+  of its row. The per-day gain figures under each cell now carry the explanation the text was
+  doing.
+- MODULE, the day names and the dates are black rather than grey — they are column
+  identifiers, not secondary labels.
+- Dates in US format: `8/30/2026 – 9/5/2026` in the picker, `8/30` in the column heads.
+  Built by splitting the ISO string, NOT via `new Date()`: `new Date('2026-08-30')` is UTC
+  midnight and renders as the 29th anywhere west of Greenwich, which would shift every
+  column heading by a day.
+- Day names 20px, dates 18px — roughly double. They are the first thing a PM scans, so they
+  no longer inherit the 10px size shared with MODULE and COMPLETE.
