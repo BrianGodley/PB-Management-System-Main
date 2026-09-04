@@ -13,8 +13,9 @@
 // far as one carrying five. Where every module on a job shares a GPMD this is
 // identical to the profit weighting the per-job grid uses, since GLPE is just
 // man days × GPMD.
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import { resolveRates, jobProfitAsOf, completionAsOf } from '../lib/jobProfit'
 
 function isJobOpen(j) {
@@ -58,6 +59,19 @@ async function fetchIn(table, column, ids, select) {
 }
 
 const NO_STAGE = '__none__'
+// The saved view is one person's preference about what to look at, not shared
+// company data — so it is keyed by user id and never leaves their browser. Two
+// people on the same machine keep separate views.
+const viewKey = userId => `pb.tracking.allJobs.stageFilter:${userId || 'anon'}`
+
+function loadSavedView(userId) {
+  try {
+    const raw = localStorage.getItem(viewKey(userId))
+    return raw ? new Set(JSON.parse(raw)) : new Set()
+  } catch {
+    return new Set()
+  }
+}
 
 export default function AllJobsTracking({
   jobs = [],
@@ -65,6 +79,8 @@ export default function AllJobsTracking({
   statusFilter = 'open',
   onSelectJob,
 }) {
+  const { user } = useAuth()
+  const userId = user?.id
   const [settings, setSettings] = useState(null)
   const [modulesByJob, setModulesByJob] = useState(new Map())
   const [compByJob, setCompByJob] = useState(new Map())
@@ -72,7 +88,34 @@ export default function AllJobsTracking({
   const [loading, setLoading] = useState(true)
   // Stages the user has switched OFF. Empty means everything is included, so a
   // stage added to the pipeline later shows up without anyone re-picking it.
-  const [excludedStages, setExcludedStages] = useState(() => new Set())
+  const [excludedStages, setExcludedStages] = useState(() => loadSavedView(userId))
+  const [stageOpen, setStageOpen] = useState(false)
+  useEffect(() => {
+    setExcludedStages(loadSavedView(userId))
+  }, [userId])
+  const [savedFlash, setSavedFlash] = useState(false)
+  const stageRef = useRef(null)
+
+  // Click anywhere outside the panel to close it.
+  useEffect(() => {
+    if (!stageOpen) return
+    const onDown = e => {
+      if (stageRef.current && !stageRef.current.contains(e.target)) setStageOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [stageOpen])
+
+  function saveView() {
+    try {
+      localStorage.setItem(viewKey(userId), JSON.stringify([...excludedStages]))
+      setSavedFlash(true)
+      setTimeout(() => setSavedFlash(false), 1800)
+    } catch {
+      // Private browsing or a full store — the filter still applies, it just
+      // will not survive a reload, so say nothing rather than block the user.
+    }
+  }
 
   const visible = useMemo(
     () => jobs.filter(j => (statusFilter === 'closed' ? !isJobOpen(j) : isJobOpen(j))),
@@ -104,6 +147,14 @@ export default function AllJobsTracking({
     () => visible.filter(j => !excludedStages.has(j.stage_id || NO_STAGE)),
     [visible, excludedStages]
   )
+
+  const stageSummary = useMemo(() => {
+    const on = stageChips.filter(c => !excludedStages.has(c.id))
+    if (on.length === stageChips.length) return 'All stages'
+    if (on.length === 0) return 'No stages'
+    if (on.length === 1) return on[0].name
+    return `${on.length} of ${stageChips.length} stages`
+  }, [stageChips, excludedStages])
 
   function toggleStage(id) {
     setExcludedStages(prev => {
@@ -270,39 +321,83 @@ export default function AllJobsTracking({
       )}
 
       {stageChips.length > 1 && (
-        <div className="mb-3 flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-bold text-gray-500 mr-1">Stage</span>
-          {stageChips.map(c => {
-            const on = !excludedStages.has(c.id)
-            return (
-              <button
-                key={c.id}
-                onClick={() => toggleStage(c.id)}
-                className={`rounded-full border px-3 py-1 text-sm font-semibold transition-colors ${
-                  on
-                    ? 'border-green-600 bg-green-50 text-green-800'
-                    : 'border-gray-200 bg-white text-gray-400 hover:text-gray-600'
-                }`}
-              >
-                {c.name}
-                <span className={`ml-1.5 text-xs ${on ? 'text-green-600' : 'text-gray-300'}`}>
-                  {c.count}
-                </span>
-              </button>
-            )
-          })}
-          <button
-            onClick={() => setExcludedStages(new Set())}
-            className="ml-1 text-xs font-semibold text-gray-500 underline hover:text-gray-700"
-          >
-            All
-          </button>
-          <button
-            onClick={() => setExcludedStages(new Set(stageChips.map(c => c.id)))}
-            className="text-xs font-semibold text-gray-500 underline hover:text-gray-700"
-          >
-            None
-          </button>
+        <div className="mb-3 flex items-center gap-2" ref={stageRef}>
+          <div className="relative">
+            <button
+              onClick={() => setStageOpen(o => !o)}
+              className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              <span className="text-gray-500">Stage</span>
+              <span>{stageSummary}</span>
+              <span className="text-gray-400">▾</span>
+            </button>
+
+            {stageOpen && (
+              <div className="absolute left-0 z-20 mt-1 w-72 rounded-xl border border-gray-200 bg-white shadow-lg">
+                <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
+                  <span className="text-xs font-bold uppercase tracking-wide text-gray-400">
+                    Include stages
+                  </span>
+                  <span className="flex gap-2">
+                    <button
+                      onClick={() => setExcludedStages(new Set())}
+                      className="text-xs font-semibold text-green-700 hover:underline"
+                    >
+                      All
+                    </button>
+                    <button
+                      onClick={() => setExcludedStages(new Set(stageChips.map(c => c.id)))}
+                      className="text-xs font-semibold text-gray-500 hover:underline"
+                    >
+                      None
+                    </button>
+                  </span>
+                </div>
+
+                <div className="max-h-80 overflow-auto py-1">
+                  {stageChips.map(c => {
+                    const on = !excludedStages.has(c.id)
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => toggleStage(c.id)}
+                        className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-gray-50"
+                      >
+                        <span
+                          className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border-2 ${
+                            on ? 'border-green-600' : 'border-gray-300'
+                          }`}
+                        >
+                          {on && <span className="h-2 w-2 rounded-full bg-green-600" />}
+                        </span>
+                        <span
+                          className={`flex-1 text-sm ${on ? 'font-semibold text-gray-800' : 'text-gray-400'}`}
+                        >
+                          {c.name}
+                        </span>
+                        <span className="text-xs tabular-nums text-gray-400">{c.count}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <div className="border-t border-gray-100 px-3 py-2">
+                  <button
+                    onClick={saveView}
+                    className="w-full rounded-lg bg-green-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-800"
+                  >
+                    Save view
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {savedFlash && (
+            <span className="text-sm font-semibold text-green-700">
+              Saved — this is your default
+            </span>
+          )}
         </div>
       )}
 
