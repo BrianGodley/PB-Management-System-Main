@@ -1046,3 +1046,8 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - The standing limitation this documents: per-module labour cost is MEASURED only when a
   crew works one module at a time. Overlapping work is apportioned, and only a clock-in that
   names its module could recover the truth.
+
+- The totals-row `DeltaBadge` was still 11px from when the whole table was smaller, so MD
+  Difference and Labor Difference read as footnotes beside 16px figures. Now 16px with the
+  percentage at 12px. Verified at 16px in BOTH Module Breakdown and Crew Breakdown — they
+  share `ModuleTable`, so the single change covers both.

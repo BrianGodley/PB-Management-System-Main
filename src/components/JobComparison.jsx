@@ -56,10 +56,12 @@ function DeltaBadge({ est, act, currency = false, inverse = false }) {
   const color = delta === 0 ? 'text-gray-400' : bad ? 'text-red-600' : 'text-green-600'
   const arrow = delta === 0 ? '—' : delta > 0 ? '▲' : '▼'
   return (
-    <span className={`text-[11px] font-semibold ${color}`}>
+    // Sits in the breakdown's totals row beside 16px figures, so it carries the
+    // same weight — it was still at 11px from when the whole table was smaller.
+    <span className={`text-base font-semibold whitespace-nowrap ${color}`}>
       {arrow} {currency ? fmt(Math.abs(delta)) : fmtD(Math.abs(delta))}
       {pct != null && (
-        <span className="ml-0.5 font-normal opacity-70">({Math.abs(pct).toFixed(0)}%)</span>
+        <span className="ml-1 text-xs font-normal opacity-70">({Math.abs(pct).toFixed(0)}%)</span>
       )}
     </span>
   )
