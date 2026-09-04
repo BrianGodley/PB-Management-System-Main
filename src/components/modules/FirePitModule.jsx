@@ -8,8 +8,13 @@ import GpmdBar from './GpmdBar'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor } from '../../lib/walkAccess'
 import { groutCuFtPerBlock } from '../../lib/cmuGrout'
-import { catalogItemFor, catalogOptions, fetchModuleCatalog, fetchStandardRateMap } from '../../lib/materialCatalog'
-import { computeCapRow, computeFinishRow, WF_META, WF_LIST } from './firePitCalc'
+import {
+  catalogItemFor,
+  catalogOptions,
+  fetchModuleCatalog,
+  fetchStandardRateMap,
+} from '../../lib/materialCatalog'
+import { computeCapRow, computeFinishRow, computeFillRow, WF_META, WF_LIST } from './firePitCalc'
 import { FINISH_TYPE_REFKEY, CAP_TYPE_REFKEY } from './finishesCalc'
 import { MAT } from '../../lib/materialRefs'
 import { TRENCH_LABOR_RATE_NAME, trenchHours, trenchRowHrs } from '../../lib/trench'
@@ -124,8 +129,18 @@ const CMU_BLOCK_SUBCAT = 'Wall Block'
 const MODULAR_SUBCAT = 'Modular Wall'
 const BRICK_SUBCAT = 'Brick'
 const CONC_MIX_SUBCAT = 'Concrete Mix'
-const SUBCAT_FOR = { CMU: CMU_BLOCK_SUBCAT, PIP: CONC_MIX_SUBCAT, Modular: MODULAR_SUBCAT, Brick: BRICK_SUBCAT }
-const TYPE_LABEL = { CMU: 'Block Type', PIP: 'Concrete Mix', Modular: 'Block Type', Brick: 'Brick Type' }
+const SUBCAT_FOR = {
+  CMU: CMU_BLOCK_SUBCAT,
+  PIP: CONC_MIX_SUBCAT,
+  Modular: MODULAR_SUBCAT,
+  Brick: BRICK_SUBCAT,
+}
+const TYPE_LABEL = {
+  CMU: 'Block Type',
+  PIP: 'Concrete Mix',
+  Modular: 'Block Type',
+  Brick: 'Brick Type',
+}
 
 // New per-type material lines resolve ONLY from the catalog ($0 if unpriced) —
 // no hardcoded material fallback (mirrors Columns). Mortar + form lumber.
@@ -166,11 +181,15 @@ function subcatVendorOptions(materialRows, subcat, vendorNames = {}) {
 // Product options for a sub-category filtered by the chosen vendor (vendor-first).
 function subcatProductOptions(materialRows, subcat, vendorSel) {
   const isStd = !vendorSel || vendorSel === 'Standard'
-  return (materialRows || [])
-    .filter(r => r.sub_category === subcat && (isStd ? r.vendor_id == null : r.vendor_id === vendorSel))
-    // Option VALUE = the item's frozen ref_key (picker stores it, rename-proof);
-    // catalogRowById resolves ref_key or a legacy id save.
-    .map(r => ({ value: r.ref_key || r.id, label: r.name, row: r }))
+  return (
+    (materialRows || [])
+      .filter(
+        r => r.sub_category === subcat && (isStd ? r.vendor_id == null : r.vendor_id === vendorSel)
+      )
+      // Option VALUE = the item's frozen ref_key (picker stores it, rename-proof);
+      // catalogRowById resolves ref_key or a legacy id save.
+      .map(r => ({ value: r.ref_key || r.id, label: r.name, row: r }))
+  )
 }
 function labelWithDims(row) {
   const d = blockDims(row, { w: 0, h: 0, l: 0 })
@@ -223,6 +242,15 @@ const CAP_META = {
 const CAP_LIST = Object.keys(CAP_META)
 const CAP_ROW = () => ({ vendor: 'Standard', type: '', lf: '' })
 
+// ── Fire pit fill (lava rock / fire glass) ────────────────────────────────────
+// Measured in CUBIC FEET. Products are ordinary catalog items under the Fire Pit
+// category, so the picker is vendor-first like every other section: the row's
+// Vendor filters the Type list. One labor rate covers all fill, in hours per
+// Cu Ft, and an unset rate surfaces the fix-it modal rather than pricing at 0.
+const FILL_CAT = 'Fire Pit Fill'
+const FILL_LAB = { dbName: 'FP Fill Labor Rate' }
+const FILL_ROW = () => ({ vendor: 'Standard', type: '', cuft: '' })
+
 // ── Master-list finish/cap support ───────────────────────────────────────────
 // A material_rates row tagged sub_category=cat (Unspecified) becomes a selectable
 // finish/cap Type. Its material unit is the row's unit_cost; every other calc
@@ -255,18 +283,30 @@ function masterWallMeta(cat, typeLabel, materialRows, category = null, vendorSel
 // catalog items merged with the built-in labels (built-in fallback); a real
 // vendor → ONLY that vendor's catalog items. Category scoping (e.g. Fire Pit vs
 // Outdoor Kitchen Wall Finish) is combined with the vendor filter.
-function masterWallOptions(cat, builtInList, materialRows, category = null, vendorSel = 'Standard') {
+function masterWallOptions(
+  cat,
+  builtInList,
+  materialRows,
+  category = null,
+  vendorSel = 'Standard'
+) {
   const isStd = !vendorSel || vendorSel === 'Standard' || vendorSel === 'auto'
   if (!isStd) {
     // Real vendor → only that vendor's catalog items (no built-in fallback).
-    return catalogOptions(materialRows, cat, vendorSel, { standardRows: 'null-vendor', stripPrefix: true, category })
-      .map(o => o.label)
+    return catalogOptions(materialRows, cat, vendorSel, {
+      standardRows: 'null-vendor',
+      stripPrefix: true,
+      category,
+    }).map(o => o.label)
   }
   // Catalog-only: Standard/unset → the null-vendor (Standard) catalog items.
   // Built-in list no longer injected as options (single source of truth); an
   // unseeded sub-category yields an empty list (picker shows its placeholder).
-  return catalogOptions(materialRows, cat, 'Standard', { standardRows: 'null-vendor', stripPrefix: true, category })
-    .map(o => o.label)
+  return catalogOptions(materialRows, cat, 'Standard', {
+    standardRows: 'null-vendor',
+    stripPrefix: true,
+    category,
+  }).map(o => o.label)
 }
 
 // ── Electrical & Plumbing catalog — GAS ONLY (ported from Utilities module) ────
@@ -275,23 +315,67 @@ function masterWallOptions(cat, builtInList, materialRows, category = null, vend
 // below are used only when the DB row is absent. A vendor overrides ONLY the
 // material price for the selected item; labor always comes from the built-in.
 const UTILITY_LINE_TYPES = {
-  '1-1/2" Poly Gas Pipe': { dbName: '1-1/2" Poly Gas Pipe', laborDbName: '1-1/2" Poly Gas Pipe - Labor Rate' },
-  '1" Black Iron Gas Pipe': { dbName: '1" Black Iron Gas Pipe', laborDbName: '1" Black Iron Gas Pipe - Labor Rate' },
-  '1-1/2" Black Iron Gas Pipe': { dbName: '1-1/2" Black Iron Gas Pipe', laborDbName: '1-1/2" Black Iron Gas Pipe - Labor Rate' },
-  '2" Black Iron Gas Pipe': { dbName: '2" Black Iron Gas Pipe', laborDbName: '2" Black Iron Gas Pipe - Labor Rate' },
+  '1-1/2" Poly Gas Pipe': {
+    dbName: '1-1/2" Poly Gas Pipe',
+    laborDbName: '1-1/2" Poly Gas Pipe - Labor Rate',
+  },
+  '1" Black Iron Gas Pipe': {
+    dbName: '1" Black Iron Gas Pipe',
+    laborDbName: '1" Black Iron Gas Pipe - Labor Rate',
+  },
+  '1-1/2" Black Iron Gas Pipe': {
+    dbName: '1-1/2" Black Iron Gas Pipe',
+    laborDbName: '1-1/2" Black Iron Gas Pipe - Labor Rate',
+  },
+  '2" Black Iron Gas Pipe': {
+    dbName: '2" Black Iron Gas Pipe',
+    laborDbName: '2" Black Iron Gas Pipe - Labor Rate',
+  },
 }
 const GAS_FIXTURE_TYPES = {
-  '12" Single Gas Ring': { dbName: '12" Single Gas Ring', laborDbName: '12" Single Gas Ring - Labor Rate' },
-  '18" Single Gas Ring': { dbName: '18" Single Gas Ring', laborDbName: '18" Single Gas Ring - Labor Rate' },
-  '24" Single Gas Ring': { dbName: '24" Single Gas Ring', laborDbName: '24" Single Gas Ring - Labor Rate' },
-  '24" Double Gas Ring': { dbName: '24" Double Gas Ring', laborDbName: '24" Double Gas Ring - Labor Rate' },
-  "2' Straight Gas Bar": { dbName: "2' Straight Gas Bar", laborDbName: "2' Straight Gas Bar - Labor Rate" },
-  "3' Straight Gas Bar": { dbName: "3' Straight Gas Bar", laborDbName: "3' Straight Gas Bar - Labor Rate" },
-  "4' Straight Gas Bar": { dbName: "4' Straight Gas Bar", laborDbName: "4' Straight Gas Bar - Labor Rate" },
-  'Gas Shut-Off Valve': { dbName: 'Gas Shut-Off Valve', laborDbName: 'Gas Shut-Off Valve - Labor Rate' },
+  '12" Single Gas Ring': {
+    dbName: '12" Single Gas Ring',
+    laborDbName: '12" Single Gas Ring - Labor Rate',
+  },
+  '18" Single Gas Ring': {
+    dbName: '18" Single Gas Ring',
+    laborDbName: '18" Single Gas Ring - Labor Rate',
+  },
+  '24" Single Gas Ring': {
+    dbName: '24" Single Gas Ring',
+    laborDbName: '24" Single Gas Ring - Labor Rate',
+  },
+  '24" Double Gas Ring': {
+    dbName: '24" Double Gas Ring',
+    laborDbName: '24" Double Gas Ring - Labor Rate',
+  },
+  "2' Straight Gas Bar": {
+    dbName: "2' Straight Gas Bar",
+    laborDbName: "2' Straight Gas Bar - Labor Rate",
+  },
+  "3' Straight Gas Bar": {
+    dbName: "3' Straight Gas Bar",
+    laborDbName: "3' Straight Gas Bar - Labor Rate",
+  },
+  "4' Straight Gas Bar": {
+    dbName: "4' Straight Gas Bar",
+    laborDbName: "4' Straight Gas Bar - Labor Rate",
+  },
+  'Gas Shut-Off Valve': {
+    dbName: 'Gas Shut-Off Valve',
+    laborDbName: 'Gas Shut-Off Valve - Labor Rate',
+  },
 }
-const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, laborDbName: t.laborDbName }))
-const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({ label, dbName: t.dbName, laborDbName: t.laborDbName }))
+const LINE_TYPE_ARR = Object.entries(UTILITY_LINE_TYPES).map(([label, t]) => ({
+  label,
+  dbName: t.dbName,
+  laborDbName: t.laborDbName,
+}))
+const GAS_TYPE_ARR = Object.entries(GAS_FIXTURE_TYPES).map(([label, t]) => ({
+  label,
+  dbName: t.dbName,
+  laborDbName: t.laborDbName,
+}))
 // Gas pipes live under the 'Gas Pipe' sub-category (Utilities module moved them
 // there); Fire Pit's "Gas Line" picker + calc must match, or it resolves nothing.
 const UTIL_CAT = { line: 'Gas Pipe', gas: 'Gas Fixtures' }
@@ -412,9 +496,10 @@ function EpTable({
                         onChange={e => upd(i, 'type', e.target.value)}
                       >
                         {!row.type && <option value="">Select type</option>}
-                        {row.type && !opts.some(o => (o.ref_key || o.label) === row.type || o.label === row.type) && (
-                          <option value={row.type}>{matName(row.type)}</option>
-                        )}
+                        {row.type &&
+                          !opts.some(
+                            o => (o.ref_key || o.label) === row.type || o.label === row.type
+                          ) && <option value={row.type}>{matName(row.type)}</option>}
                         {opts.map(o => (
                           <option key={o.label} value={o.ref_key || o.label}>
                             {o.label}
@@ -424,7 +509,11 @@ function EpTable({
                     </div>
                   </td>
                   <td className="py-1 pr-2">
-                    <NumInput value={row[qtyField]} onChange={v => upd(i, qtyField, v)} className="w-full text-center" />
+                    <NumInput
+                      value={row[qtyField]}
+                      onChange={v => upd(i, qtyField, v)}
+                      className="w-full text-center"
+                    />
                   </td>
                   <td className="py-1 text-center text-gray-400 text-xs pr-2">
                     <span className="inline-flex items-center justify-center gap-1">
@@ -505,26 +594,50 @@ function calcCmuStruct(s, mp = {}, materialRows = []) {
   const groutCY = groutCF / 27
   const digHrs = footingCF > 0 ? footingCF * p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
   const footingPourHrs = footingCY > 0 ? footingCY * p(FP_RATES.footingPourLab.dbName) : 0
-  const rebarHrs = totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
-  const setBlockHrs = rawBlocks > 0 ? rawBlocks * p(FP_RATES.blockLab.dbName, FP_RATES.blockLab.fallback) : 0
-  const groutRate = s.useGroutPump === 'Yes'
-    ? p(FP_RATES.pumpGroutLab.dbName, FP_RATES.pumpGroutLab.fallback)
-    : p(FP_RATES.handGroutLab.dbName, FP_RATES.handGroutLab.fallback)
+  const rebarHrs =
+    totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
+  const setBlockHrs =
+    rawBlocks > 0 ? rawBlocks * p(FP_RATES.blockLab.dbName, FP_RATES.blockLab.fallback) : 0
+  const groutRate =
+    s.useGroutPump === 'Yes'
+      ? p(FP_RATES.pumpGroutLab.dbName, FP_RATES.pumpGroutLab.fallback)
+      : p(FP_RATES.handGroutLab.dbName, FP_RATES.handGroutLab.fallback)
   const groutHrs = groutCF > 0 ? groutCF * groutRate : 0
   const structuralBaseHrs = digHrs + footingPourHrs + rebarHrs + setBlockHrs + groutHrs
   const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * p('FP Curve Labor Factor')
   const picked = catalogRowById(materialRows, s.matType)
-  const blockPrice = picked ? n(picked.unit_cost) : p(FP_RATES.fpBlock.dbName, FP_RATES.fpBlock.fallback)
+  const blockPrice = picked
+    ? n(picked.unit_cost)
+    : p(FP_RATES.fpBlock.dbName, FP_RATES.fpBlock.fallback)
   const blockMat = totalBlocks * blockPrice
   const rebarMat = totalRebarLF * p('Rebar ' + (s.rebarSize || '#4'), FP_RATES.fpRebar.fallback)
   const footingMat = footingCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
   const groutMat = groutCY * p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
-  const pumpSetupMat = s.useGroutPump === 'Yes' && groutCF > 0
-    ? p(FP_RATES.fpGroutPump.dbName, FP_RATES.fpGroutPump.fallback)
-    : 0
+  const pumpSetupMat =
+    s.useGroutPump === 'Yes' && groutCF > 0
+      ? p(FP_RATES.fpGroutPump.dbName, FP_RATES.fpGroutPump.fallback)
+      : 0
   const mat = blockMat + rebarMat + footingMat + groutMat + pumpSetupMat
   const hrs = n(s.layoutHrs) + structuralBaseHrs + curveAddHrs
-  return { mat, hrs, blocksPerCourse, coursesCount, rawBlocks, totalBlocks, footingCF, footingCY, groutCF, groutCY, totalRebarLF, curveAddHrs, blockMat, rebarMat, footingMat, groutMat, pumpSetupMat }
+  return {
+    mat,
+    hrs,
+    blocksPerCourse,
+    coursesCount,
+    rawBlocks,
+    totalBlocks,
+    footingCF,
+    footingCY,
+    groutCF,
+    groutCY,
+    totalRebarLF,
+    curveAddHrs,
+    blockMat,
+    rebarMat,
+    footingMat,
+    groutMat,
+    pumpSetupMat,
+  }
 }
 
 // Poured in Place — poured volume = wallLF × (height/12) × (wall width/12) → CY ×
@@ -541,7 +654,9 @@ function calcPipStruct(s, mp = {}, materialRows = []) {
   const formSF = 2 * wallLF * wallHt
   const { footingCF, footingCY, totalRebarLF } = structFootingRebar(s)
   const picked = catalogRowById(materialRows, s.matType)
-  const mixPrice = picked ? n(picked.unit_cost) : p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
+  const mixPrice = picked
+    ? n(picked.unit_cost)
+    : p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)
   const pourMat = pourCY * mixPrice
   const formMat = formSF * p(FORM_LUMBER_NAME, 0)
   const rebarMat = totalRebarLF * p('Rebar ' + (s.rebarSize || '#4'), FP_RATES.fpRebar.fallback)
@@ -549,13 +664,27 @@ function calcPipStruct(s, mp = {}, materialRows = []) {
   const mat = pourMat + formMat + rebarMat + footingMat
   const digHrs = footingCF > 0 ? footingCF * p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
   const footingPourHrs = footingCY > 0 ? footingCY * p(FP_RATES.footingPourLab.dbName) : 0
-  const rebarHrs = totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
+  const rebarHrs =
+    totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
   const pourHrs = pourCY * p(FP_POUR_LAB.dbName, FP_POUR_LAB.fallback)
   const formHrs = formSF * p(FP_FORM_LAB.dbName, FP_FORM_LAB.fallback)
   const structuralBaseHrs = digHrs + footingPourHrs + rebarHrs + pourHrs + formHrs
   const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * p('FP Curve Labor Factor')
   const hrs = n(s.layoutHrs) + structuralBaseHrs + curveAddHrs
-  return { mat, hrs, pourCY, formSF, footingCF, footingCY, totalRebarLF, curveAddHrs, pourMat, formMat, rebarMat, footingMat }
+  return {
+    mat,
+    hrs,
+    pourCY,
+    formSF,
+    footingCF,
+    footingCY,
+    totalRebarLF,
+    curveAddHrs,
+    pourMat,
+    formMat,
+    rebarMat,
+    footingMat,
+  }
 }
 
 // Modular — block stack from the picked 'Modular Wall' row's dims × price
@@ -579,12 +708,28 @@ function calcModularStruct(s, mp = {}, materialRows = []) {
   const mat = blockMat + rebarMat + footingMat
   const digHrs = footingCF > 0 ? footingCF * p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
   const footingPourHrs = footingCY > 0 ? footingCY * p(FP_RATES.footingPourLab.dbName) : 0
-  const rebarHrs = totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
-  const setBlockHrs = rawBlocks > 0 ? rawBlocks * p(FP_RATES.blockLab.dbName, FP_RATES.blockLab.fallback) : 0
+  const rebarHrs =
+    totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
+  const setBlockHrs =
+    rawBlocks > 0 ? rawBlocks * p(FP_RATES.blockLab.dbName, FP_RATES.blockLab.fallback) : 0
   const structuralBaseHrs = digHrs + footingPourHrs + rebarHrs + setBlockHrs
   const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * p('FP Curve Labor Factor')
   const hrs = n(s.layoutHrs) + structuralBaseHrs + curveAddHrs
-  return { mat, hrs, blocksPerCourse, coursesCount, rawBlocks, totalBlocks, footingCF, footingCY, totalRebarLF, curveAddHrs, blockMat, rebarMat, footingMat }
+  return {
+    mat,
+    hrs,
+    blocksPerCourse,
+    coursesCount,
+    rawBlocks,
+    totalBlocks,
+    footingCF,
+    footingCY,
+    totalRebarLF,
+    curveAddHrs,
+    blockMat,
+    rebarMat,
+    footingMat,
+  }
 }
 
 // Brick — bricks = face SF (wallLF × height) × per_sqft (calc_meta.per_sqft,
@@ -607,12 +752,26 @@ function calcBrickStruct(s, mp = {}, materialRows = []) {
   const mat = brickMat + mortarMat + rebarMat + footingMat
   const digHrs = footingCF > 0 ? footingCF * p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback) : 0
   const footingPourHrs = footingCY > 0 ? footingCY * p(FP_RATES.footingPourLab.dbName) : 0
-  const rebarHrs = totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
+  const rebarHrs =
+    totalRebarLF > 0 ? totalRebarLF * p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback) : 0
   const brickHrs = faceSF * p(FP_BRICK_LAY.dbName, FP_BRICK_LAY.fallback)
   const structuralBaseHrs = digHrs + footingPourHrs + rebarHrs + brickHrs
   const curveAddHrs = structuralBaseHrs * (n(s.pctCurved) / 100) * p('FP Curve Labor Factor')
   const hrs = n(s.layoutHrs) + structuralBaseHrs + curveAddHrs
-  return { mat, hrs, faceSF, bricks, footingCF, footingCY, totalRebarLF, curveAddHrs, brickMat, mortarMat, rebarMat, footingMat }
+  return {
+    mat,
+    hrs,
+    faceSF,
+    bricks,
+    footingCF,
+    footingCY,
+    totalRebarLF,
+    curveAddHrs,
+    brickMat,
+    mortarMat,
+    rebarMat,
+    footingMat,
+  }
 }
 
 // STRUCT_CALC now lives in the React-free ./firePitStruct (unit-tested there); it's
@@ -636,6 +795,7 @@ function calcFirePit(
     structs,
     capRows,
     wallFinishRows,
+    fillRows,
     trenchRows,
     epLineRows,
     epGasRows,
@@ -654,8 +814,11 @@ function calcFirePit(
   // Math lives in the pure, unit-tested firePitCalc.js; here we resolve the catalog
   // meta + vendor price and inject them, then collect any unpriced-labor flag.
   const finishRowCalc = row => {
-    const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, WF_CATEGORY, row.vendor)
-    const vendorUnit = wfVendorPrice(row.vendor, row.type, materialRows, WF_CAT, { category: WF_CATEGORY })
+    const meta =
+      WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, WF_CATEGORY, row.vendor)
+    const vendorUnit = wfVendorPrice(row.vendor, row.type, materialRows, WF_CAT, {
+      category: WF_CATEGORY,
+    })
     const r = computeFinishRow(row, { meta, vendorUnit, mp, fpRates: FP_RATES })
     if (r.laborUnset) laborUnset.push(r.laborUnset)
     return r
@@ -666,7 +829,8 @@ function calcFirePit(
 
   // ── Wall cap per-row calc: $/LF material (vendor-overridable) + hrs/LF labor ──
   const capRowCalc = row => {
-    const meta = CAP_META[row.type] || masterWallMeta(CAP_CAT, row.type, materialRows, null, row.vendor)
+    const meta =
+      CAP_META[row.type] || masterWallMeta(CAP_CAT, row.type, materialRows, null, row.vendor)
     const vendorUnit = wfVendorPrice(row.vendor, row.type, materialRows, CAP_CAT)
     const r = computeCapRow(row, { meta, vendorUnit, mp, fpRates: FP_RATES })
     if (r.laborUnset) laborUnset.push(r.laborUnset)
@@ -677,6 +841,17 @@ function calcFirePit(
   // Every section is itemized on both tabs now (mirrors Columns); the Sub tab
   // differs only in the financial roll-up (labor+burden become the sub cost).
   const capHrs = capCalc.reduce((s, c) => s + c.hrs, 0)
+
+  // ── Fire pit fill: Cu Ft × $/Cu Ft material + Cu Ft × hrs/Cu Ft labor ───────
+  const fillRowCalc = row => {
+    const item = catalogRowById(materialRows, row.type)
+    const r = computeFillRow(row, { item, mp, labName: FILL_LAB.dbName })
+    if (r.laborUnset) laborUnset.push(r.laborUnset)
+    return r
+  }
+  const fillCalc = (fillRows || []).map(fillRowCalc)
+  const fillMat = fillCalc.reduce((s, c) => s + c.mat, 0)
+  const fillHrs = fillCalc.reduce((s, c) => s + c.hrs, 0)
 
   // ── Trenching (shared math with Utilities via lib/trench) — own section now
   //    (was a per-LF coefficient baked into the gas line). ───────────────────────
@@ -692,8 +867,21 @@ function calcFirePit(
     if (!r.type) return
     const lf = n(r.lf)
     if (lf <= 0) return
-    const { matCost, laborVal, laborName } = resolveUtilRow(UTIL_CAT.line, r, LINE_TYPE_ARR, materialRows, mp)
-    if (laborVal <= 0) laborUnset.push({ kind: 'labor', name: laborName, label: r.type, category: 'Utilities', unit: null })
+    const { matCost, laborVal, laborName } = resolveUtilRow(
+      UTIL_CAT.line,
+      r,
+      LINE_TYPE_ARR,
+      materialRows,
+      mp
+    )
+    if (laborVal <= 0)
+      laborUnset.push({
+        kind: 'labor',
+        name: laborName,
+        label: r.type,
+        category: 'Utilities',
+        unit: null,
+      })
     epMat += lf * matCost
     epHrs += lf * laborVal
   })
@@ -701,8 +889,21 @@ function calcFirePit(
     if (!r.type) return
     const qty = n(r.qty)
     if (qty <= 0) return
-    const { matCost, laborVal, laborName } = resolveUtilRow(UTIL_CAT.gas, r, GAS_TYPE_ARR, materialRows, mp)
-    if (laborVal <= 0) laborUnset.push({ kind: 'labor', name: laborName, label: r.type, category: 'Utilities', unit: null })
+    const { matCost, laborVal, laborName } = resolveUtilRow(
+      UTIL_CAT.gas,
+      r,
+      GAS_TYPE_ARR,
+      materialRows,
+      mp
+    )
+    if (laborVal <= 0)
+      laborUnset.push({
+        kind: 'labor',
+        name: laborName,
+        label: r.type,
+        category: 'Utilities',
+        unit: null,
+      })
     epMat += qty * matCost
     epHrs += qty * laborVal
   })
@@ -731,7 +932,7 @@ function calcFirePit(
   })
 
   // ── Totals — both tabs itemize; only the roll-up differs (mirrors Columns) ────
-  const baseHrs = structureHrs + capHrs + finishHrs + epHrs + manHrs
+  const baseHrs = structureHrs + capHrs + finishHrs + fillHrs + epHrs + manHrs
 
   const diffMod = 1 + n(difficulty) / 100
   const _preWalkHrs = baseHrs * diffMod + n(hoursAdj)
@@ -739,7 +940,7 @@ function calcFirePit(
   const totalHrs = _preWalkHrs + walkHrs
   const manDays = totalHrs / 8
 
-  const totalMat = structureMatVal + capMat + finishMat + epMat + manMat
+  const totalMat = structureMatVal + capMat + finishMat + fillMat + epMat + manMat
 
   const laborCost = totalHrs * lrph
   const burden = laborCost * n(laborBurdenPct)
@@ -797,6 +998,9 @@ function calcFirePit(
     finishHrs,
     finishesMat: finishMat,
     wallFinishCalc,
+    fillMat,
+    fillHrs,
+    fillCalc,
     epMat,
     epHrs,
     manMat,
@@ -817,7 +1021,9 @@ function SectionHeader({ title }) {
   const isSub = useContext(SubTabContext)
   return (
     <div className="bg-gray-100 rounded-lg px-4 py-2.5 border border-gray-200 mb-2">
-      <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wider">{subSectionTitle(title, isSub)}</h3>
+      <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wider">
+        {subSectionTitle(title, isSub)}
+      </h3>
     </div>
   )
 }
@@ -904,6 +1110,7 @@ function makeTab(src = {}) {
     },
     capRows: src.capRows ?? [CAP_ROW(), CAP_ROW()],
     wallFinishRows: src.wallFinishRows ?? [WF_ROW(), WF_ROW()],
+    fillRows: src.fillRows ?? [FILL_ROW()],
     trenchRows: src.trenchRows ?? [TRENCH_ROW()],
     epLineRows: src.epLineRows ?? [EP_LINE_ROW(), EP_LINE_ROW()],
     epGasRows: src.epGasRows ?? [EP_GAS_ROW(), EP_GAS_ROW()],
@@ -913,12 +1120,8 @@ function makeTab(src = {}) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function FirePitModule({ onSave, onBack, saving, initialData }) {
-  const [laborRatePerHour, setLaborRatePerHour] = useState(
-    initialData?.laborRatePerHour ?? null
-  )
-  const [laborBurdenPct, setLaborBurdenPct] = useState(
-    initialData?.laborBurdenPct ?? null
-  )
+  const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? null)
+  const [laborBurdenPct, setLaborBurdenPct] = useState(initialData?.laborBurdenPct ?? null)
   const [gpmd, setGpmd] = useState(initialData?.gpmd ?? null)
   const [subGpMarkupRate, setSubGpMarkupRate] = useState(initialData?.subGpMarkupRate ?? null)
   // Material markup comes from the project, same as the sub rate. 0 = sold at cost.
@@ -948,7 +1151,14 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     // catalog comes from the shared Fire Pit / Outdoor Kitchen / Walls
     // categories ('Wall Finish' and 'Wall Cap' subcategories, unchanged names).
     const [matMap, labRes, rows, venRes] = await Promise.all([
-      fetchStandardRateMap(['Fire Pit', 'Utilities', 'Basic Materials', 'Concrete', 'Walls', 'Finishes']),
+      fetchStandardRateMap([
+        'Fire Pit',
+        'Utilities',
+        'Basic Materials',
+        'Concrete',
+        'Walls',
+        'Finishes',
+      ]),
       supabase
         .from('labor_rates')
         .select('name, rate')
@@ -967,7 +1177,9 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     ;(labRes.data || []).forEach(r => {
       prices[r.name] = parseFloat(r.rate) || 0
     })
-    setMaterialPrices(initialData?.materialPrices ? { ...prices, ...initialData.materialPrices } : prices)
+    setMaterialPrices(
+      initialData?.materialPrices ? { ...prices, ...initialData.materialPrices } : prices
+    )
     setMaterialRows(rows || [])
     setVendors(
       (venRes.data || []).map(v => ({
@@ -989,8 +1201,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
           if (!data) return
           if (data.labor_rate_per_hour != null)
             setLaborRatePerHour(parseFloat(data.labor_rate_per_hour))
-          if (data.labor_burden_pct != null)
-            setLaborBurdenPct(parseFloat(data.labor_burden_pct))
+          if (data.labor_burden_pct != null) setLaborBurdenPct(parseFloat(data.labor_burden_pct))
           if (data.estimate_gpmd_default != null) setGpmd(parseFloat(data.estimate_gpmd_default))
           if (data.sub_gp_markup_rate != null)
             setSubGpMarkupRate(parseFloat(data.sub_gp_markup_rate))
@@ -1017,8 +1228,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   const cur = isSub ? subTab : ihTab
   const setCur = isSub ? setSubTab : setIhTab
   // A single setter factory: accepts a value (scalar fields) or an updater fn (row arrays).
-  const setField = k => v =>
-    setCur(p => ({ ...p, [k]: typeof v === 'function' ? v(p[k]) : v }))
+  const setField = k => v => setCur(p => ({ ...p, [k]: typeof v === 'function' ? v(p[k]) : v }))
   // Derived active-tab (non-structure) field accessors.
   const difficulty = cur.difficulty
   const setDifficulty = setField('difficulty')
@@ -1077,6 +1287,8 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   const setCapRows = setField('capRows')
   const wallFinishRows = cur.wallFinishRows
   const setWallFinishRows = setField('wallFinishRows')
+  const fillRows = cur.fillRows
+  const setFillRows = setField('fillRows')
   const trenchRows = cur.trenchRows
   const setTrenchRows = setField('trenchRows')
   const updateTrench = (i, field, val) =>
@@ -1141,11 +1353,21 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     setCapRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   const setWallFinishRow = (i, field, val) =>
     setWallFinishRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  const setFillRow = (i, field, val) =>
+    setFillRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
 
-  const vendorsForCategory = cat => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat)))
+  const vendorsForCategory = cat =>
+    vendors.filter(v =>
+      materialRows.some(r => r.vendor_id === v.id && (r.sub_category === cat || r.category === cat))
+    )
   // Wall-finish vendor list scoped to this module's own Category so it lists only
   // vendors that priced a Wall Finish product under 'Fire Pit' (not OK/Walls).
-  const vendorsForFinish = () => vendors.filter(v => materialRows.some(r => r.vendor_id === v.id && r.sub_category === WF_CAT && r.category === WF_CATEGORY))
+  const vendorsForFinish = () =>
+    vendors.filter(v =>
+      materialRows.some(
+        r => r.vendor_id === v.id && r.sub_category === WF_CAT && r.category === WF_CATEGORY
+      )
+    )
 
   function handleSave() {
     onSave({
@@ -1174,7 +1396,8 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   const vendorNames = Object.fromEntries((vendors || []).map(v => [v.id, v.name]))
 
   // ── Structure Type-picker option sources (vendor-first, per structure type) ──
-  const structVendorOptions = type => subcatVendorOptions(materialRows, SUBCAT_FOR[type], vendorNames)
+  const structVendorOptions = type =>
+    subcatVendorOptions(materialRows, SUBCAT_FOR[type], vendorNames)
   const structTypeOptions = (type, vendorSel) =>
     subcatProductOptions(materialRows, SUBCAT_FOR[type], vendorSel).map(o => ({
       value: o.value,
@@ -1208,7 +1431,15 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
         }))
     }
     return [
-      { label: `Standard — ${dbName}`, table: 'material_price', name: dbName, category: 'Fire Pit', unitLabel: unit, mode: 'currency', value: fallback },
+      {
+        label: `Standard — ${dbName}`,
+        table: 'material_price',
+        name: dbName,
+        category: 'Fire Pit',
+        unitLabel: unit,
+        mode: 'currency',
+        value: fallback,
+      },
     ]
   }
   // Every catalog product tagged with a sub-category (Wall Cap / Wall Finish),
@@ -1235,559 +1466,371 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
 
   return (
     <SubTabContext.Provider value={isSub}>
-    <div className="space-y-5">
-      {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
-        <div className="px-6 pt-1 pb-1 bg-gray-900">
-          <GpmdBar
-            variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
-            sticky
-            totalMat={calc.totalMat}
-            totalHrs={calc.totalHrs}
-            manDays={calc.manDays}
-            laborCost={calc.laborCost}
-            laborRatePerHour={laborRatePerHour}
-            burden={calc.burden}
-            directGp={calc.gp}
-            directCommission={calc.commission}
-            subCost={calc.subCost}
-            gpmd={gpmd}
-            directPrice={calc.price}
-            subMarkupRate={subGpMarkupRate}
-            materialMarkupRate={materialGpMarkupRate}
-          />
-        </div>
-        <div className="px-6 py-2">
-          <CrewTypeBar
-            crewType={crewType}
-            onCrewTypeChange={setCrewType}
-            title="Fire Pit"
-            moduleType="Fire Pit"
-            rateScope={RATE_SCOPE}
-            refreshAllRates={refreshAllRates}
-            showInlineToggle={false}
-          />
-        </div>
-        {/* ── Frozen Structure-Type sub-tab bar (mirrors ColumnsModule). ── */}
-        <div className="px-6 pb-2">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Structure Type</p>
-          <div className="flex gap-2">
-            {STRUCT_TYPE_TABS.map(t => (
-              <button
-                key={t.key}
-                onClick={() => setStructureType(t.key)}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                  structureType === t.key
-                    ? 'bg-green-700 text-white border-green-700'
-                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {t.label}
-                {structTypeCount(t.key) > 0 ? ' •' : ''}
-              </button>
-            ))}
+      <div className="space-y-5">
+        {/* ── Frozen header: GPMD bar + Crew Type / View Rates bar ── */}
+        <div className="sticky top-0 z-20 -mx-6 bg-white shadow-md">
+          <div className="px-6 pt-1 pb-1 bg-gray-900">
+            <GpmdBar
+              variant={subType === 'Subcontractor' ? 'sub' : 'inhouse'}
+              sticky
+              totalMat={calc.totalMat}
+              totalHrs={calc.totalHrs}
+              manDays={calc.manDays}
+              laborCost={calc.laborCost}
+              laborRatePerHour={laborRatePerHour}
+              burden={calc.burden}
+              directGp={calc.gp}
+              directCommission={calc.commission}
+              subCost={calc.subCost}
+              gpmd={gpmd}
+              directPrice={calc.price}
+              subMarkupRate={subGpMarkupRate}
+              materialMarkupRate={materialGpMarkupRate}
+            />
           </div>
-        </div>
-      </div>
-
-      <ModuleHeaderSlot>
-        <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
-      </ModuleHeaderSlot>
-
-      {pricesLoading && (
-        <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
-          Loading material prices from Master Rates…
-        </div>
-      )}
-
-      {calc.laborUnset && calc.laborUnset.length > 0 && (
-        <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
-          <span className="font-semibold">Labor rate needed</span> — these gas/electrical items
-          contribute 0 labor hours until a rate is set. Click one to set it inline:
-          <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
-            {calc.laborUnset.map((u, i) =>
-              u.name ? (
-                <button
-                  key={u.name || i}
-                  type="button"
-                  onClick={() => setLaborModalItem(u)}
-                  className="rounded border border-amber-400 bg-white/70 px-1.5 py-0.5 font-medium text-amber-900 hover:bg-white"
-                >
-                  {u.label} ↗
-                </button>
-              ) : (
-                <span key={(u.label || '') + i} className="px-1 py-0.5 text-amber-800">
-                  {u.label}
-                </span>
-              )
-            )}
-          </span>
-        </div>
-      )}
-
-      <UnpricedItemModal
-        item={laborModalItem}
-        onClose={() => setLaborModalItem(null)}
-        onSaved={refreshAllRates}
-      />
-
-      {/* Settings — Job Site Conditions is In-House only (hidden on Sub tab) */}
-      {subType !== 'Subcontractor' && (
-        <>
-      <SectionHeader title="Job Site Conditions" />
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
-          <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
-        </div>
-        <div>
-          <p
-            className="text-xs text-gray-500 mb-0.5"
-            title="Average Distance from Truck to Work Area"
-          >
-            Truck → Work Area (Avg LF)
-          </p>
-          <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
-          {calc.walkHrs > 0 && (
-            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">
-              +{calc.walkHrs.toFixed(2)} hrs walk-access
+          <div className="px-6 py-2">
+            <CrewTypeBar
+              crewType={crewType}
+              onCrewTypeChange={setCrewType}
+              title="Fire Pit"
+              moduleType="Fire Pit"
+              rateScope={RATE_SCOPE}
+              refreshAllRates={refreshAllRates}
+              showInlineToggle={false}
+            />
+          </div>
+          {/* ── Frozen Structure-Type sub-tab bar (mirrors ColumnsModule). ── */}
+          <div className="px-6 pb-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+              Structure Type
             </p>
-          )}
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
-          <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
-        </div>
-      </div>
-        </>
-      )}
-
-      {/* ── Fire Pit Installation — per structure type (CMU/PIP/Modular/Brick) ── */}
-      <div>
-        <SectionHeader title="Fire Pit Installation" />
-
-        {/* Vendor + Type material picker (vendor-first, catalog-sourced). */}
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Vendor</label>
-            <select
-              className="input text-sm py-1.5 w-full"
-              value={structVendor || 'Standard'}
-              onChange={e => {
-                setStructVendor(e.target.value)
-                setStructMatType('')
-              }}
-            >
-              {structVendorOptions(structureType).map(o => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">{TYPE_LABEL[structureType]}</label>
-            {(() => {
-              const opts = structTypeOptions(structureType, structVendor)
-              return (
-                <select
-                  className="input text-sm py-1.5 w-full"
-                  value={structMatType || ''}
-                  onChange={e => setStructMatType(e.target.value)}
+            <div className="flex gap-2">
+              {STRUCT_TYPE_TABS.map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => setStructureType(t.key)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    structureType === t.key
+                      ? 'bg-green-700 text-white border-green-700'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
                 >
-                  <option value="">{opts.length ? 'Select…' : 'No products — add in Master Rates'}</option>
-                  {structMatType && !opts.some(o => o.value === structMatType) && (
-                    <option value={structMatType}>
-                      {catalogRowById(materialRows, structMatType)?.name || structMatType}
-                    </option>
-                  )}
-                  {opts.map(o => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              )
-            })()}
+                  {t.label}
+                  {structTypeCount(t.key) > 0 ? ' •' : ''}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Wall takeoff fields. */}
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Wall Perimeter (LF)</label>
-            <NumInput value={wallLF} onChange={setWallLF} placeholder="0" />
+        <ModuleHeaderSlot>
+          <WorkTypeChooser value={subType || 'In-House'} onChange={setSubType} compact />
+        </ModuleHeaderSlot>
+
+        {pricesLoading && (
+          <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+            Loading material prices from Master Rates…
           </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Wall Height (inches)</label>
-            <NumInput value={wallHeightIn} onChange={setWallHeightIn} placeholder="40" />
+        )}
+
+        {calc.laborUnset && calc.laborUnset.length > 0 && (
+          <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
+            <span className="font-semibold">Labor rate needed</span> — these gas/electrical items
+            contribute 0 labor hours until a rate is set. Click one to set it inline:
+            <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
+              {calc.laborUnset.map((u, i) =>
+                u.name ? (
+                  <button
+                    key={u.name || i}
+                    type="button"
+                    onClick={() => setLaborModalItem(u)}
+                    className="rounded border border-amber-400 bg-white/70 px-1.5 py-0.5 font-medium text-amber-900 hover:bg-white"
+                  >
+                    {u.label} ↗
+                  </button>
+                ) : (
+                  <span key={(u.label || '') + i} className="px-1 py-0.5 text-amber-800">
+                    {u.label}
+                  </span>
+                )
+              )}
+            </span>
           </div>
-          {structureType === 'PIP' && (
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Wall Width / Thickness (inches)</label>
-              <NumInput value={wallWidthIn} onChange={setWallWidthIn} placeholder="8" />
+        )}
+
+        <UnpricedItemModal
+          item={laborModalItem}
+          onClose={() => setLaborModalItem(null)}
+          onSaved={refreshAllRates}
+        />
+
+        {/* Settings — Job Site Conditions is In-House only (hidden on Sub tab) */}
+        {subType !== 'Subcontractor' && (
+          <>
+            <SectionHeader title="Job Site Conditions" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
+                <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
+              </div>
+              <div>
+                <p
+                  className="text-xs text-gray-500 mb-0.5"
+                  title="Average Distance from Truck to Work Area"
+                >
+                  Truck → Work Area (Avg LF)
+                </p>
+                <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
+                {calc.walkHrs > 0 && (
+                  <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">
+                    +{calc.walkHrs.toFixed(2)} hrs walk-access
+                  </p>
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
+                <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
+              </div>
             </div>
-          )}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Footing Width (inches)</label>
-            <NumInput value={footingWidthIn} onChange={setFootingWidthIn} placeholder="12" />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Footing Depth (inches)</label>
-            <NumInput value={footingDepthIn} onChange={setFootingDepthIn} placeholder="12" />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Rebar Spacing (inches)</label>
-            <NumInput value={rebarSpacingIn} onChange={setRebarSpacingIn} placeholder="16" />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Rebar Size</label>
-            <select
-              className="input text-sm py-1.5 w-full"
-              value={rebarSize}
-              onChange={e => setRebarSize(e.target.value)}
-              title="Rebar bar size"
-            >
-              {REBAR_SIZES.map(s => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Bond Beam Courses</label>
-            <NumInput value={bondBeamCourses} onChange={setBondBeamCourses} placeholder="1" />
-          </div>
-          {structureType === 'CMU' && (
+          </>
+        )}
+
+        {/* ── Fire Pit Installation — per structure type (CMU/PIP/Modular/Brick) ── */}
+        <div>
+          <SectionHeader title="Fire Pit Installation" />
+
+          {/* Vendor + Type material picker (vendor-first, catalog-sourced). */}
+          <div className="grid grid-cols-2 gap-3 mb-3">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">% Grouted</label>
+              <label className="block text-xs text-gray-500 mb-1">Vendor</label>
+              <select
+                className="input text-sm py-1.5 w-full"
+                value={structVendor || 'Standard'}
+                onChange={e => {
+                  setStructVendor(e.target.value)
+                  setStructMatType('')
+                }}
+              >
+                {structVendorOptions(structureType).map(o => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">
+                {TYPE_LABEL[structureType]}
+              </label>
+              {(() => {
+                const opts = structTypeOptions(structureType, structVendor)
+                return (
+                  <select
+                    className="input text-sm py-1.5 w-full"
+                    value={structMatType || ''}
+                    onChange={e => setStructMatType(e.target.value)}
+                  >
+                    <option value="">
+                      {opts.length ? 'Select…' : 'No products — add in Master Rates'}
+                    </option>
+                    {structMatType && !opts.some(o => o.value === structMatType) && (
+                      <option value={structMatType}>
+                        {catalogRowById(materialRows, structMatType)?.name || structMatType}
+                      </option>
+                    )}
+                    {opts.map(o => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                )
+              })()}
+            </div>
+          </div>
+
+          {/* Wall takeoff fields. */}
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Wall Perimeter (LF)</label>
+              <NumInput value={wallLF} onChange={setWallLF} placeholder="0" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Wall Height (inches)</label>
+              <NumInput value={wallHeightIn} onChange={setWallHeightIn} placeholder="40" />
+            </div>
+            {structureType === 'PIP' && (
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">
+                  Wall Width / Thickness (inches)
+                </label>
+                <NumInput value={wallWidthIn} onChange={setWallWidthIn} placeholder="8" />
+              </div>
+            )}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Footing Width (inches)</label>
+              <NumInput value={footingWidthIn} onChange={setFootingWidthIn} placeholder="12" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Footing Depth (inches)</label>
+              <NumInput value={footingDepthIn} onChange={setFootingDepthIn} placeholder="12" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Rebar Spacing (inches)</label>
+              <NumInput value={rebarSpacingIn} onChange={setRebarSpacingIn} placeholder="16" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Rebar Size</label>
+              <select
+                className="input text-sm py-1.5 w-full"
+                value={rebarSize}
+                onChange={e => setRebarSize(e.target.value)}
+                title="Rebar bar size"
+              >
+                {REBAR_SIZES.map(s => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Bond Beam Courses</label>
+              <NumInput value={bondBeamCourses} onChange={setBondBeamCourses} placeholder="1" />
+            </div>
+            {structureType === 'CMU' && (
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">% Grouted</label>
+                <div className="relative">
+                  <NumInput value={pctGrouted} onChange={setPctGrouted} placeholder="100" />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                    %
+                  </span>
+                </div>
+              </div>
+            )}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">% Curved Wall</label>
               <div className="relative">
-                <NumInput value={pctGrouted} onChange={setPctGrouted} placeholder="100" />
+                <NumInput value={pctCurved} onChange={setPctCurved} placeholder="0" />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
                   %
                 </span>
               </div>
             </div>
+          </div>
+
+          {structureType === 'CMU' && (
+            <LabeledRow label="Use Grout Pump?">
+              <select
+                className="input text-sm py-1.5 w-28"
+                value={useGroutPump}
+                onChange={e => setUseGroutPump(e.target.value)}
+              >
+                <option>No</option>
+                <option>Yes</option>
+              </select>
+            </LabeledRow>
           )}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">% Curved Wall</label>
-            <div className="relative">
-              <NumInput value={pctCurved} onChange={setPctCurved} placeholder="0" />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                %
-              </span>
-            </div>
-          </div>
-        </div>
 
-        {structureType === 'CMU' && (
-          <LabeledRow label="Use Grout Pump?">
-            <select
-              className="input text-sm py-1.5 w-28"
-              value={useGroutPump}
-              onChange={e => setUseGroutPump(e.target.value)}
-            >
-              <option>No</option>
-              <option>Yes</option>
-            </select>
+          <LabeledRow label="Layout Time (Hours)">
+            <NumInput value={layoutHrs} onChange={setLayoutHrs} placeholder="0" className="w-28" />
           </LabeledRow>
-        )}
 
-        <LabeledRow label="Layout Time (Hours)">
-          <NumInput value={layoutHrs} onChange={setLayoutHrs} placeholder="0" className="w-28" />
-        </LabeledRow>
-
-        {n(wallLF) > 0 && (
-          <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-gray-600 flex flex-wrap gap-4">
-            {calc.structActive.totalBlocks ? (
+          {n(wallLF) > 0 && (
+            <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-gray-600 flex flex-wrap gap-4">
+              {calc.structActive.totalBlocks ? (
+                <span>
+                  Blocks: <strong>{calc.structActive.totalBlocks.toFixed(0)}</strong> (
+                  {calc.structActive.blocksPerCourse} × {calc.structActive.coursesCount} courses +
+                  10% waste)
+                </span>
+              ) : null}
+              {calc.structActive.bricks ? (
+                <span>
+                  Bricks: <strong>{Math.round(calc.structActive.bricks)}</strong> (
+                  {calc.structActive.faceSF?.toFixed(0)} Sq Ft face)
+                </span>
+              ) : null}
+              {calc.structActive.pourCY ? (
+                <span>
+                  Concrete: <strong>{calc.structActive.pourCY.toFixed(3)} Cu Yd</strong>
+                </span>
+              ) : null}
               <span>
-                Blocks: <strong>{calc.structActive.totalBlocks.toFixed(0)}</strong> ({calc.structActive.blocksPerCourse} × {calc.structActive.coursesCount} courses + 10% waste)
+                Footing: <strong>{(calc.structActive.footingCY || 0).toFixed(3)} Cu Yd</strong>
               </span>
-            ) : null}
-            {calc.structActive.bricks ? (
+              {calc.structActive.groutCY ? (
+                <span>
+                  Grout: <strong>{calc.structActive.groutCY.toFixed(3)} Cu Yd</strong>
+                </span>
+              ) : null}
               <span>
-                Bricks: <strong>{Math.round(calc.structActive.bricks)}</strong> ({calc.structActive.faceSF?.toFixed(0)} Sq Ft face)
+                Rebar: <strong>{(calc.structActive.totalRebarLF || 0).toFixed(0)} Ln Ft</strong>
               </span>
-            ) : null}
-            {calc.structActive.pourCY ? (
-              <span>
-                Concrete: <strong>{calc.structActive.pourCY.toFixed(3)} Cu Yd</strong>
-              </span>
-            ) : null}
-            <span>
-              Footing: <strong>{(calc.structActive.footingCY || 0).toFixed(3)} Cu Yd</strong>
-            </span>
-            {calc.structActive.groutCY ? (
-              <span>
-                Grout: <strong>{calc.structActive.groutCY.toFixed(3)} Cu Yd</strong>
-              </span>
-            ) : null}
-            <span>
-              Rebar: <strong>{(calc.structActive.totalRebarLF || 0).toFixed(0)} Ln Ft</strong>
-            </span>
-            {calc.structActive.curveAddHrs > 0 && (
-              <span>
-                Curve add: <strong>{calc.structActive.curveAddHrs.toFixed(2)} hrs</strong>
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ── Wall Caps ── */}
-      <div>
-        <SectionHeader title="Wall Caps" />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm table-fixed">
-            <colgroup>
-              <col className="w-[128px]" />
-              <col />
-              <col className="w-[84px]" />
-              <col className="w-[96px]" />
-              <col className="w-[112px]" />
-              <col className="w-6" />
-            </colgroup>
-            <thead>
-              <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
-                <th className="text-center pb-1 pr-2 font-medium">Type</th>
-                <th className="text-center pb-1 pr-2 font-medium">Ln Ft</th>
-                <th className="text-center pb-1 pr-2 font-medium text-gray-400">$ per Ln Ft</th>
-                <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {capRows.map((row, i) => {
-                const meta = CAP_META[row.type] || masterWallMeta(CAP_CAT, row.type, materialRows, null, row.vendor)
-                const rc = calc.capCalc?.[i] || {}
-                return (
-                  <tr key={i} className="border-b border-gray-100">
-                    <td className="py-1 pr-2">
-                      <select
-                        className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-full"
-                        value={row.vendor || 'Standard'}
-                        onChange={e => setCapRow(i, 'vendor', e.target.value)}
-                        title="Vendor — overrides material price"
-                      >
-                        <option value="Standard">Standard</option>
-                        {vendorsForCategory(CAP_CAT).map(v => (
-                          <option key={v.id} value={v.id}>
-                            {v.name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="py-1 pr-2">
-                      <span className="flex items-center gap-1">
-                        <select
-                          className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white flex-1 min-w-0"
-                          value={row.type || ''}
-                          onChange={e => setCapRow(i, 'type', e.target.value)}
-                        >
-                          {(() => {
-                            const capOpts = masterWallOptions(CAP_CAT, CAP_LIST, materialRows, null, row.vendor)
-                            return (
-                              <>
-                                {!row.type && <option value="">Select cap</option>}
-                                {row.type && !capOpts.includes(row.type) && (
-                                  <option value={row.type}>{row.type}</option>
-                                )}
-                                {capOpts.map(t => (
-                                  <option key={t} value={t}>
-                                    {t}
-                                  </option>
-                                ))}
-                              </>
-                            )
-                          })()}
-                        </select>
-                      </span>
-                    </td>
-                    <td className="py-1 pr-2">
-                      <NumInput value={row.lf} onChange={v => setCapRow(i, 'lf', v)} className="w-full text-center" />
-                    </td>
-                    <td className="py-1 pr-2 text-center text-gray-400 text-xs">
-                      {rc.unit ? `$${rc.unit.toFixed(2)} per Ln Ft` : '—'}
-                    </td>
-                    <td className="py-1 text-center text-xs text-gray-600">
-                      {rc.mat > 0 ? `$${rc.mat.toFixed(2)}` : '—'}
-                      {rc.hrs > 0 ? (
-                        <span className="text-gray-400"> · {rc.hrs.toFixed(1)}h</span>
-                      ) : null}
-                    </td>
-                    <td className="py-1 text-center">
-                      {capRows.length > 1 && (
-                        <button
-                          type="button"
-                          className="text-gray-300 hover:text-red-500"
-                          title="Remove row"
-                          onClick={() => setCapRows(rs => rs.filter((_, idx) => idx !== i))}
-                        >
-                          ×
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-          <button
-            type="button"
-            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
-            onClick={() => setCapRows(rs => [...rs, CAP_ROW()])}
-          >
-            + Add row
-          </button>
+              {calc.structActive.curveAddHrs > 0 && (
+                <span>
+                  Curve add: <strong>{calc.structActive.curveAddHrs.toFixed(2)} hrs</strong>
+                </span>
+              )}
+            </div>
+          )}
         </div>
-      </div>
 
-      {/* ── Trenching (mirrors Utilities) ── */}
-      <div>
-        <SectionHeader title="Trenching" />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-1 pr-2 font-medium">Method</th>
-                <th className="text-left pb-1 pr-2 font-medium">Linear Feet</th>
-                <th className="text-left pb-1 pr-2 font-medium">Width (In)</th>
-                <th className="text-left pb-1 font-medium">Depth (In)</th>
-                <th className="text-right pb-1 font-medium text-gray-400">Est. Hrs</th>
-              </tr>
-            </thead>
-            <tbody>
-              {trenchRows.map((row, i) => {
-                const hrs = trenchRowHrs(row, materialPrices).hrs
-                return (
-                  <tr key={i} className="border-b border-gray-100">
-                    <td className="py-1 pr-2">
-                      <select
-                        className="input text-sm py-1 flex-1 min-w-0"
-                        value={row.equipment}
-                        onChange={e => updateTrench(i, 'equipment', e.target.value)}
-                      >
-                        <option>Trench</option>
-                        <option>Hand</option>
-                      </select>
-                    </td>
-                    <td className="py-1 pr-2">
-                      <NumInput value={row.lf} onChange={v => updateTrench(i, 'lf', v)} />
-                    </td>
-                    <td className="py-1 pr-2">
-                      <NumInput value={row.width} onChange={v => updateTrench(i, 'width', v)} />
-                    </td>
-                    <td className="py-1">
-                      <NumInput value={row.depth} onChange={v => updateTrench(i, 'depth', v)} />
-                    </td>
-                    <td className="py-1 text-right text-gray-500 text-xs pl-2">{hrs > 0 ? hrs.toFixed(2) : '—'}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-          <button
-            type="button"
-            className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
-            onClick={() => setTrenchRows(r => [...r, TRENCH_ROW()])}
-          >
-            + Add row
-          </button>
-        </div>
-      </div>
-
-      {/* ── Gas Line ── */}
-      <div>
-        <SectionHeader title="Gas Line" />
-        <EpTable
-          rows={epLineRows}
-          setRows={setEpLineRows}
-          arr={LINE_TYPE_ARR}
-          cat={UTIL_CAT.line}
-          qtyField="lf"
-          qtyLabel="Linear Feet"
-          unitLabel="LF"
-          newRow={EP_LINE_ROW}
-          materialRows={materialRows}
-          materialPrices={materialPrices}
-          refreshAllRates={refreshAllRates}
-          vendorsForCategory={vendorsForCategory}
-        />
-      </div>
-
-      {/* ── Gas Fixtures ── */}
-      <div>
-        <SectionHeader title="Gas Fixtures" />
-        <EpTable
-          rows={epGasRows}
-          setRows={setEpGasRows}
-          arr={GAS_TYPE_ARR}
-          cat={UTIL_CAT.gas}
-          qtyField="qty"
-          qtyLabel="Qty"
-          unitLabel="ea"
-          newRow={EP_GAS_ROW}
-          materialRows={materialRows}
-          materialPrices={materialPrices}
-          refreshAllRates={refreshAllRates}
-          vendorsForCategory={vendorsForCategory}
-        />
-      </div>
-
-      {/* ── Wall Finishes — CMU + PIP only (hidden on Modular + Brick). Rows are
+        {/* ── Wall Finishes — CMU + PIP only (hidden on Modular + Brick). Rows are
           tab-level so entered data still prices when hidden. ── */}
-      {(structureType === 'CMU' || structureType === 'PIP') && (
-      <div>
-        <SectionHeader title="Wall Finishes" />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm table-fixed">
-            <colgroup>
-              <col className="w-[128px]" />
-              <col />
-              <col className="w-[72px]" />
-              <col className="w-[96px]" />
-              <col className="w-[112px]" />
-            </colgroup>
-            <thead>
-              <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
-                <th className="text-center pb-1 pr-2 font-medium">Type</th>
-                <th className="text-center pb-1 pr-2 font-medium">Sq Ft</th>
-                <th className="text-center pb-1 pr-2 font-medium text-gray-400">$/Unit</th>
-                <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
-              </tr>
-            </thead>
-            <tbody>
-              {wallFinishRows.map((row, i) => {
-                const meta = WF_META[row.type] || masterWallMeta(WF_CAT, row.type, materialRows, WF_CATEGORY, row.vendor)
-                const rc = calc.wallFinishCalc?.[i] || {}
-                return (
-                  <tr key={i} className="border-b border-gray-100">
-                    <td className="py-1 pr-2">
-                      <select
-                        className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-full"
-                        value={row.vendor || 'Standard'}
-                        onChange={e => setWallFinishRow(i, 'vendor', e.target.value)}
-                        title="Vendor — overrides material price"
-                      >
-                        <option value="Standard">Standard</option>
-                        {vendorsForFinish().map(v => (
-                          <option key={v.id} value={v.id}>
-                            {v.name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="py-1 pr-2">
-                      <span className="flex items-center gap-1">
-                        <select
-                          className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white flex-1 min-w-0"
-                          value={row.type || ''}
-                          onChange={e => setWallFinishRow(i, 'type', e.target.value)}
-                        >
-                          {/* Options are the canonical finishes (WF_META keys), NOT raw
+        {(structureType === 'CMU' || structureType === 'PIP') && (
+          <div>
+            <SectionHeader title="Wall Finishes" />
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm table-fixed">
+                <colgroup>
+                  <col className="w-[128px]" />
+                  <col />
+                  <col className="w-[72px]" />
+                  <col className="w-[96px]" />
+                  <col className="w-[112px]" />
+                </colgroup>
+                <thead>
+                  <tr className="text-xs text-gray-500 border-b border-gray-200">
+                    <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
+                    <th className="text-center pb-1 pr-2 font-medium">Type</th>
+                    <th className="text-center pb-1 pr-2 font-medium">Sq Ft</th>
+                    <th className="text-center pb-1 pr-2 font-medium text-gray-400">$/Unit</th>
+                    <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {wallFinishRows.map((row, i) => {
+                    const meta =
+                      WF_META[row.type] ||
+                      masterWallMeta(WF_CAT, row.type, materialRows, WF_CATEGORY, row.vendor)
+                    const rc = calc.wallFinishCalc?.[i] || {}
+                    return (
+                      <tr key={i} className="border-b border-gray-100">
+                        <td className="py-1 pr-2">
+                          <select
+                            className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-full"
+                            value={row.vendor || 'Standard'}
+                            onChange={e => setWallFinishRow(i, 'vendor', e.target.value)}
+                            title="Vendor — overrides material price"
+                          >
+                            <option value="Standard">Standard</option>
+                            {vendorsForFinish().map(v => (
+                              <option key={v.id} value={v.id}>
+                                {v.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-1 pr-2">
+                          <span className="flex items-center gap-1">
+                            <select
+                              className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white flex-1 min-w-0"
+                              value={row.type || ''}
+                              onChange={e => setWallFinishRow(i, 'type', e.target.value)}
+                            >
+                              {/* Options are the canonical finishes (WF_META keys), NOT raw
                               catalog names. masterWallOptions dumped every 'Finish Material'
                               row — junk (Concrete Truck, *Flatwork) + full '<Type> - Finishes'
                               names — none of which round-trip to a WF_META key, so every
@@ -1795,113 +1838,425 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                               material+labor (Fire Pit's default type is empty, so NO finish
                               priced). Every WF_LIST option maps to WF_META → FP_RATES (shared
                               '- Finishes' record). Same fix as Outdoor Kitchen. */}
-                          {!row.type && <option value="">Select material</option>}
-                          {row.type && !WF_LIST.includes(row.type) && (
-                            <option value={row.type}>{row.type}</option>
-                          )}
-                          {WF_LIST.map(t => (
-                            <option key={t} value={t}>
-                              {t}
+                              {!row.type && <option value="">Select material</option>}
+                              {row.type && !WF_LIST.includes(row.type) && (
+                                <option value={row.type}>{row.type}</option>
+                              )}
+                              {WF_LIST.map(t => (
+                                <option key={t} value={t}>
+                                  {t}
+                                </option>
+                              ))}
+                            </select>
+                          </span>
+                        </td>
+                        <td className="py-1 pr-2">
+                          <NumInput
+                            value={row.sf}
+                            onChange={v => setWallFinishRow(i, 'sf', v)}
+                            className="w-full text-center"
+                          />
+                        </td>
+                        <td className="py-1 pr-2 text-center text-gray-400 text-xs">
+                          {rc.unit
+                            ? `$${rc.unit.toFixed(2)}/${meta?.unit === 'ton' ? 'ton' : 'SF'}`
+                            : '—'}
+                        </td>
+                        <td className="py-1 text-center text-xs text-gray-600">
+                          {rc.mat > 0 ? `$${rc.mat.toFixed(2)}` : '—'}
+                          {rc.hrs > 0 ? (
+                            <span className="text-gray-400"> · {rc.hrs.toFixed(1)}h</span>
+                          ) : null}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── Wall Caps ── */}
+        <div>
+          <SectionHeader title="Wall Caps" />
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm table-fixed">
+              <colgroup>
+                <col className="w-[128px]" />
+                <col />
+                <col className="w-[84px]" />
+                <col className="w-[96px]" />
+                <col className="w-[112px]" />
+                <col className="w-6" />
+              </colgroup>
+              <thead>
+                <tr className="text-xs text-gray-500 border-b border-gray-200">
+                  <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
+                  <th className="text-center pb-1 pr-2 font-medium">Type</th>
+                  <th className="text-center pb-1 pr-2 font-medium">Ln Ft</th>
+                  <th className="text-center pb-1 pr-2 font-medium text-gray-400">$ per Ln Ft</th>
+                  <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {capRows.map((row, i) => {
+                  const meta =
+                    CAP_META[row.type] ||
+                    masterWallMeta(CAP_CAT, row.type, materialRows, null, row.vendor)
+                  const rc = calc.capCalc?.[i] || {}
+                  return (
+                    <tr key={i} className="border-b border-gray-100">
+                      <td className="py-1 pr-2">
+                        <select
+                          className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-full"
+                          value={row.vendor || 'Standard'}
+                          onChange={e => setCapRow(i, 'vendor', e.target.value)}
+                          title="Vendor — overrides material price"
+                        >
+                          <option value="Standard">Standard</option>
+                          {vendorsForCategory(CAP_CAT).map(v => (
+                            <option key={v.id} value={v.id}>
+                              {v.name}
                             </option>
                           ))}
                         </select>
-                      </span>
-                    </td>
-                    <td className="py-1 pr-2">
-                      <NumInput value={row.sf} onChange={v => setWallFinishRow(i, 'sf', v)} className="w-full text-center" />
-                    </td>
-                    <td className="py-1 pr-2 text-center text-gray-400 text-xs">
-                      {rc.unit ? `$${rc.unit.toFixed(2)}/${meta?.unit === 'ton' ? 'ton' : 'SF'}` : '—'}
-                    </td>
-                    <td className="py-1 text-center text-xs text-gray-600">
-                      {rc.mat > 0 ? `$${rc.mat.toFixed(2)}` : '—'}
-                      {rc.hrs > 0 ? (
-                        <span className="text-gray-400"> · {rc.hrs.toFixed(1)}h</span>
-                      ) : null}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      )}
-
-      {/* ── Manual Entry ── */}
-      <div>
-        <SectionHeader title="Manual Entry" />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm table-fixed">
-            <colgroup>
-              {isSub ? (
-                <>
-                  <col className="w-1/2" />
-                  <col className="w-1/2" />
-                </>
-              ) : (
-                <>
-                  <col className="w-1/3" />
-                  <col className="w-1/3" />
-                  <col className="w-1/3" />
-                </>
-              )}
-            </colgroup>
-            <thead>
-              <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-center pb-1 pr-2 font-medium">Description</th>
-                {isSub ? (
-                  <th className="text-center pb-1 font-medium">Cost $</th>
-                ) : (
-                  <>
-                    <th className="text-center pb-1 pr-2 font-medium">Hours</th>
-                    <th className="text-center pb-1 font-medium">Materials $</th>
-                  </>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {manualRows.map((row, i) => (
-                <tr key={i} className="border-b border-gray-100">
-                  <td className="py-1 pr-2">
-                    <input
-                      className="input text-sm py-1 w-full"
-                      value={row.label}
-                      onChange={e => updateManual(i, 'label', e.target.value)}
-                    />
-                  </td>
-                  {isSub ? (
-                    <td className="py-1">
-                      <div className="flex items-center gap-1">
-                        <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} className="text-center flex-1" />
-                        {manualRows.length > 1 && (
+                      </td>
+                      <td className="py-1 pr-2">
+                        <span className="flex items-center gap-1">
+                          <select
+                            className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white flex-1 min-w-0"
+                            value={row.type || ''}
+                            onChange={e => setCapRow(i, 'type', e.target.value)}
+                          >
+                            {(() => {
+                              const capOpts = masterWallOptions(
+                                CAP_CAT,
+                                CAP_LIST,
+                                materialRows,
+                                null,
+                                row.vendor
+                              )
+                              return (
+                                <>
+                                  {!row.type && <option value="">Select cap</option>}
+                                  {row.type && !capOpts.includes(row.type) && (
+                                    <option value={row.type}>{row.type}</option>
+                                  )}
+                                  {capOpts.map(t => (
+                                    <option key={t} value={t}>
+                                      {t}
+                                    </option>
+                                  ))}
+                                </>
+                              )
+                            })()}
+                          </select>
+                        </span>
+                      </td>
+                      <td className="py-1 pr-2">
+                        <NumInput
+                          value={row.lf}
+                          onChange={v => setCapRow(i, 'lf', v)}
+                          className="w-full text-center"
+                        />
+                      </td>
+                      <td className="py-1 pr-2 text-center text-gray-400 text-xs">
+                        {rc.unit ? `$${rc.unit.toFixed(2)} per Ln Ft` : '—'}
+                      </td>
+                      <td className="py-1 text-center text-xs text-gray-600">
+                        {rc.mat > 0 ? `$${rc.mat.toFixed(2)}` : '—'}
+                        {rc.hrs > 0 ? (
+                          <span className="text-gray-400"> · {rc.hrs.toFixed(1)}h</span>
+                        ) : null}
+                      </td>
+                      <td className="py-1 text-center">
+                        {capRows.length > 1 && (
                           <button
                             type="button"
-                            onClick={() => setManualRows(rows => rows.filter((_, idx) => idx !== i))}
-                            className="text-gray-300 hover:text-red-500 text-sm px-1"
-                            title="Remove line"
+                            className="text-gray-300 hover:text-red-500"
+                            title="Remove row"
+                            onClick={() => setCapRows(rs => rs.filter((_, idx) => idx !== i))}
                           >
                             ×
                           </button>
                         )}
-                      </div>
-                    </td>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <button
+              type="button"
+              className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+              onClick={() => setCapRows(rs => [...rs, CAP_ROW()])}
+            >
+              + Add row
+            </button>
+          </div>
+        </div>
+
+        {/* ── Trenching (mirrors Utilities) ── */}
+        <div>
+          <SectionHeader title="Trenching" />
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-gray-500 border-b border-gray-200">
+                  <th className="text-left pb-1 pr-2 font-medium">Method</th>
+                  <th className="text-left pb-1 pr-2 font-medium">Linear Feet</th>
+                  <th className="text-left pb-1 pr-2 font-medium">Width (In)</th>
+                  <th className="text-left pb-1 font-medium">Depth (In)</th>
+                  <th className="text-right pb-1 font-medium text-gray-400">Est. Hrs</th>
+                </tr>
+              </thead>
+              <tbody>
+                {trenchRows.map((row, i) => {
+                  const hrs = trenchRowHrs(row, materialPrices).hrs
+                  return (
+                    <tr key={i} className="border-b border-gray-100">
+                      <td className="py-1 pr-2">
+                        <select
+                          className="input text-sm py-1 flex-1 min-w-0"
+                          value={row.equipment}
+                          onChange={e => updateTrench(i, 'equipment', e.target.value)}
+                        >
+                          <option>Trench</option>
+                          <option>Hand</option>
+                        </select>
+                      </td>
+                      <td className="py-1 pr-2">
+                        <NumInput value={row.lf} onChange={v => updateTrench(i, 'lf', v)} />
+                      </td>
+                      <td className="py-1 pr-2">
+                        <NumInput value={row.width} onChange={v => updateTrench(i, 'width', v)} />
+                      </td>
+                      <td className="py-1">
+                        <NumInput value={row.depth} onChange={v => updateTrench(i, 'depth', v)} />
+                      </td>
+                      <td className="py-1 text-right text-gray-500 text-xs pl-2">
+                        {hrs > 0 ? hrs.toFixed(2) : '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <button
+              type="button"
+              className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+              onClick={() => setTrenchRows(r => [...r, TRENCH_ROW()])}
+            >
+              + Add row
+            </button>
+          </div>
+        </div>
+
+        {/* ── Gas Line ── */}
+        <div>
+          <SectionHeader title="Gas Line" />
+          <EpTable
+            rows={epLineRows}
+            setRows={setEpLineRows}
+            arr={LINE_TYPE_ARR}
+            cat={UTIL_CAT.line}
+            qtyField="lf"
+            qtyLabel="Linear Feet"
+            unitLabel="LF"
+            newRow={EP_LINE_ROW}
+            materialRows={materialRows}
+            materialPrices={materialPrices}
+            refreshAllRates={refreshAllRates}
+            vendorsForCategory={vendorsForCategory}
+          />
+        </div>
+
+        {/* ── Gas Fixtures ── */}
+        <div>
+          <SectionHeader title="Gas Fixtures" />
+          <EpTable
+            rows={epGasRows}
+            setRows={setEpGasRows}
+            arr={GAS_TYPE_ARR}
+            cat={UTIL_CAT.gas}
+            qtyField="qty"
+            qtyLabel="Qty"
+            unitLabel="ea"
+            newRow={EP_GAS_ROW}
+            materialRows={materialRows}
+            materialPrices={materialPrices}
+            refreshAllRates={refreshAllRates}
+            vendorsForCategory={vendorsForCategory}
+          />
+        </div>
+
+        {/* ── Firepit Fill ── */}
+        <div>
+          <SectionHeader title="Firepit Fill" />
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm table-fixed">
+              <colgroup>
+                <col className="w-[128px]" />
+                <col />
+                <col className="w-[84px]" />
+                <col className="w-[112px]" />
+                <col className="w-[112px]" />
+                <col className="w-6" />
+              </colgroup>
+              <thead>
+                <tr className="text-xs text-gray-500 border-b border-gray-200">
+                  <th className="text-center pb-1 pr-2 font-medium">Vendor</th>
+                  <th className="text-center pb-1 pr-2 font-medium">Type</th>
+                  <th className="text-center pb-1 pr-2 font-medium">Cu Ft</th>
+                  <th className="text-center pb-1 pr-2 font-medium text-gray-400">$ per Cu Ft</th>
+                  <th className="text-center pb-1 font-medium text-gray-400">Material $</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {fillRows.map((row, i) => {
+                  const rc = calc.fillCalc?.[i] || {}
+                  const opts = subcatProductOptions(materialRows, FILL_CAT, row.vendor)
+                  return (
+                    <tr key={i} className="border-b border-gray-100">
+                      <td className="py-1 pr-2">
+                        <select
+                          className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-full"
+                          value={row.vendor || 'Standard'}
+                          onChange={e => setFillRow(i, 'vendor', e.target.value)}
+                          title="Vendor — the Type list is the products that vendor carries"
+                        >
+                          {subcatVendorOptions(
+                            materialRows,
+                            FILL_CAT,
+                            Object.fromEntries(vendors.map(v => [v.id, v.name]))
+                          ).map(v => (
+                            <option key={v.value} value={v.value}>
+                              {v.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="py-1 pr-2">
+                        <select
+                          className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white w-full"
+                          value={row.type || ''}
+                          onChange={e => setFillRow(i, 'type', e.target.value)}
+                        >
+                          {/* Unselected rows price at $0 — the picker starts empty
+                            rather than defaulting to whatever sorts first. */}
+                          {!row.type && <option value="">Select fill</option>}
+                          {row.type && !opts.some(o => o.value === row.type) && (
+                            <option value={row.type}>{row.type}</option>
+                          )}
+                          {opts.map(o => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="py-1 pr-2">
+                        <NumInput
+                          value={row.cuft}
+                          onChange={v => setFillRow(i, 'cuft', v)}
+                          className="w-full text-center"
+                        />
+                      </td>
+                      <td className="py-1 pr-2 text-center text-gray-400 text-xs">
+                        {rc.unit ? `$${rc.unit.toFixed(2)} per Cu Ft` : '—'}
+                      </td>
+                      <td className="py-1 text-center text-xs text-gray-600">
+                        {rc.mat > 0 ? `$${rc.mat.toFixed(2)}` : '—'}
+                        {rc.hrs > 0 ? (
+                          <span className="text-gray-400"> · {rc.hrs.toFixed(1)}h</span>
+                        ) : null}
+                      </td>
+                      <td className="py-1 text-center">
+                        {fillRows.length > 1 && (
+                          <button
+                            type="button"
+                            className="text-gray-300 hover:text-red-500"
+                            title="Remove row"
+                            onClick={() => setFillRows(rs => rs.filter((_, idx) => idx !== i))}
+                          >
+                            ×
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <button
+              type="button"
+              className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
+              onClick={() => setFillRows(rs => [...rs, FILL_ROW()])}
+            >
+              + Add row
+            </button>
+          </div>
+        </div>
+
+        {/* ── Manual Entry ── */}
+        <div>
+          <SectionHeader title="Manual Entry" />
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm table-fixed">
+              <colgroup>
+                {isSub ? (
+                  <>
+                    <col className="w-1/2" />
+                    <col className="w-1/2" />
+                  </>
+                ) : (
+                  <>
+                    <col className="w-1/3" />
+                    <col className="w-1/3" />
+                    <col className="w-1/3" />
+                  </>
+                )}
+              </colgroup>
+              <thead>
+                <tr className="text-xs text-gray-500 border-b border-gray-200">
+                  <th className="text-center pb-1 pr-2 font-medium">Description</th>
+                  {isSub ? (
+                    <th className="text-center pb-1 font-medium">Cost $</th>
                   ) : (
                     <>
-                      <td className="py-1 pr-2">
-                        <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} className="text-center" />
-                      </td>
+                      <th className="text-center pb-1 pr-2 font-medium">Hours</th>
+                      <th className="text-center pb-1 font-medium">Materials $</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {manualRows.map((row, i) => (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="py-1 pr-2">
+                      <input
+                        className="input text-sm py-1 w-full"
+                        value={row.label}
+                        onChange={e => updateManual(i, 'label', e.target.value)}
+                      />
+                    </td>
+                    {isSub ? (
                       <td className="py-1">
                         <div className="flex items-center gap-1">
                           <NumInput
-                            value={row.materials}
-                            onChange={v => updateManual(i, 'materials', v)}
+                            value={row.subCost}
+                            onChange={v => updateManual(i, 'subCost', v)}
                             className="text-center flex-1"
                           />
                           {manualRows.length > 1 && (
                             <button
                               type="button"
-                              onClick={() => setManualRows(rows => rows.filter((_, idx) => idx !== i))}
+                              onClick={() =>
+                                setManualRows(rows => rows.filter((_, idx) => idx !== i))
+                              }
                               className="text-gray-300 hover:text-red-500 text-sm px-1"
                               title="Remove line"
                             >
@@ -1910,32 +2265,67 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                           )}
                         </div>
                       </td>
-                    </>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <button
-            type="button"
-            onClick={() => setManualRows(rows => [...rows, { label: '', hours: '', materials: '', subCost: '' }])}
-            className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
-          >
-            + Add manual entry
+                    ) : (
+                      <>
+                        <td className="py-1 pr-2">
+                          <NumInput
+                            value={row.hours}
+                            onChange={v => updateManual(i, 'hours', v)}
+                            className="text-center"
+                          />
+                        </td>
+                        <td className="py-1">
+                          <div className="flex items-center gap-1">
+                            <NumInput
+                              value={row.materials}
+                              onChange={v => updateManual(i, 'materials', v)}
+                              className="text-center flex-1"
+                            />
+                            {manualRows.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setManualRows(rows => rows.filter((_, idx) => idx !== i))
+                                }
+                                className="text-gray-300 hover:text-red-500 text-sm px-1"
+                                title="Remove line"
+                              >
+                                ×
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <button
+              type="button"
+              onClick={() =>
+                setManualRows(rows => [
+                  ...rows,
+                  { label: '', hours: '', materials: '', subCost: '' },
+                ])
+              }
+              className="mt-2 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+            >
+              + Add manual entry
+            </button>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3 pt-2">
+          <button onClick={onBack} className="btn-secondary flex-1">
+            ← Back
+          </button>
+          <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
+            {saving ? 'Saving...' : 'Save'}
           </button>
         </div>
       </div>
-
-      {/* Actions */}
-      <div className="flex gap-3 pt-2">
-        <button onClick={onBack} className="btn-secondary flex-1">
-          ← Back
-        </button>
-        <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
-          {saving ? 'Saving...' : 'Save'}
-        </button>
-      </div>
-    </div>
     </SubTabContext.Provider>
   )
 }
