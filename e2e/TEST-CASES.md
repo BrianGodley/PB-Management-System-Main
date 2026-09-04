@@ -895,3 +895,22 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   scrolls.
 - Verified: no stray text on screen, 16px between toolbar and content, and the toolbar's y
   is unchanged (304px) after scrolling the body 400px — genuinely frozen, not just tall.
+
+## Breakdown table — actuals now mean clocked, matching the summary bar
+
+- The Breakdown table derived its actuals from the SCHEDULE (`work_days × crew size`) priced
+  at `labor_rate_per_man_day`, while the summary bar used clocked hours at
+  `avg_hourly_crew_rate`. On Test Tester1 that read **39.0 MD × $317.36 = $12,377** against
+  the bar's **30.4 MD × $253.20 = $7,707** — a $4,670 gap from two independent differences,
+  the man-day count AND the rate. Third instance of this same class of bug.
+- `ModuleTable` now takes `profitRows` from `lib/jobProfit`: per module, hours actually
+  clocked and what they cost. Actual man days are total hours ÷ 8, as everywhere else.
+  A module whose hours the work-order chain cannot resolve shows an em dash, not zero.
+- Columns are now Est MD · **Sched MD** · **Act MD** · Δ MD. Scheduled days stay as their own
+  column — a real and different fact — and Δ MD measures CLOCKED against estimate.
+- Verified in the browser: bar and breakdown both read 30.4 MD / $7,707.
+- DEBUGGING NOTE: the prop change silently failed the first time because prettier had
+  reformatted the indentation between the edit being written and applied, so the string
+  match missed and the old `laborRate` prop stayed. The build passed and the page rendered —
+  the only symptom was em dashes where numbers belonged. Worth re-grepping a call site after
+  a formatter runs.

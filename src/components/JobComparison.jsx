@@ -178,7 +178,14 @@ function Group({ title, accent, grow, children }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Module breakdown table — one row per work order
 // ─────────────────────────────────────────────────────────────────────────────
-function ModuleTable({ workOrders, scheduleItems, crewMap, laborRate }) {
+// `profitRows` come from lib/jobProfit — per module, the hours actually clocked
+// against it and what they cost at the burdened crew rate. This table used to
+// derive actuals from the SCHEDULE instead (work_days x crew size) priced at
+// labor_rate_per_man_day, which disagreed with the summary bar on both counts:
+// on Test Tester1 that read 39.0 scheduled MD at $317.36 = $12,377 against the
+// bar's 30.4 clocked MD at $253.20 = $7,707. Scheduled days are still shown —
+// they are a real and different fact — but ACTUAL now means clocked, everywhere.
+function ModuleTable({ workOrders, scheduleItems, crewMap, profitRows }) {
   const siByWO = useMemo(() => {
     const m = {}
     for (const item of scheduleItems) {
@@ -190,22 +197,36 @@ function ModuleTable({ workOrders, scheduleItems, crewMap, laborRate }) {
     return m
   }, [scheduleItems])
 
+  const byModule = useMemo(() => {
+    const m = new Map()
+    for (const r of profitRows || []) m.set(r.id, r)
+    return m
+  }, [profitRows])
+
   const rows = workOrders.map(wo => {
     const items = siByWO[wo.id] || []
-    const actMD = items.reduce((s, it) => s + nv(it.work_days) * crewSizeOf(crewMap[it.crew_id]), 0)
+    const schedMD = items.reduce(
+      (s, it) => s + nv(it.work_days) * crewSizeOf(crewMap[it.crew_id]),
+      0
+    )
     const estMD = nv(wo.man_days)
     const estMat = nv(wo.material_cost) + nv(wo.sub_cost)
     const estLab = nv(wo.labor_cost)
-    const actLab = actMD * laborRate
+    // null, not zero, when the work order chain could not resolve this module's
+    // hours — an unknown is not the same as nothing worked.
+    const pr = byModule.get(wo.estimate_module_id)
+    const actMD = pr?.actualManDays ?? null
+    const actLab = pr?.rlc ?? null
     const crew = wo.scheduled_crew_id ? crewMap[wo.scheduled_crew_id] : null
-    return { wo, estMD, actMD, estMat, estLab, actLab, crew }
+    return { wo, estMD, schedMD, actMD, estMat, estLab, actLab, crew }
   })
 
   const totEstMD = rows.reduce((s, r) => s + r.estMD, 0)
-  const totActMD = rows.reduce((s, r) => s + r.actMD, 0)
+  const totSchedMD = rows.reduce((s, r) => s + r.schedMD, 0)
+  const totActMD = rows.reduce((s, r) => s + (r.actMD || 0), 0)
   const totEstMat = rows.reduce((s, r) => s + r.estMat, 0)
   const totEstLab = rows.reduce((s, r) => s + r.estLab, 0)
-  const totActLab = rows.reduce((s, r) => s + r.actLab, 0)
+  const totActLab = rows.reduce((s, r) => s + (r.actLab || 0), 0)
 
   const thCls = 'px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wide'
   const tdCls = 'px-3 py-2 text-sm text-gray-700'
@@ -225,6 +246,7 @@ function ModuleTable({ workOrders, scheduleItems, crewMap, laborRate }) {
               <th className={thCls}>Crew Type</th>
               <th className={`${thCls} text-right`}>Est MD</th>
               <th className={`${thCls} text-right`}>Sched MD</th>
+              <th className={`${thCls} text-right`}>Act MD</th>
               <th className={`${thCls} text-right`}>Δ MD</th>
               <th className={`${thCls} text-right`}>Est Labor</th>
               <th className={`${thCls} text-right`}>Act Labor</th>
@@ -233,8 +255,8 @@ function ModuleTable({ workOrders, scheduleItems, crewMap, laborRate }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {rows.map(({ wo, estMD, actMD, estMat, estLab, actLab, crew }) => {
-              const mdDelta = actMD - estMD
+            {rows.map(({ wo, estMD, schedMD, actMD, estMat, estLab, actLab, crew }) => {
+              const mdDelta = actMD == null ? null : actMD - estMD
               return (
                 <tr key={wo.id} className="hover:bg-gray-50">
                   <td className={tdCls}>
@@ -257,14 +279,19 @@ function ModuleTable({ workOrders, scheduleItems, crewMap, laborRate }) {
                     {estMD > 0 ? fmtD(estMD) : '—'}
                   </td>
                   <td
-                    className={`${tdCls} text-right font-mono ${actMD > 0 ? 'text-blue-700 font-semibold' : 'text-gray-400'}`}
+                    className={`${tdCls} text-right font-mono ${schedMD > 0 ? 'text-gray-600' : 'text-gray-400'}`}
                   >
-                    {actMD > 0 ? fmtD(actMD) : '—'}
+                    {schedMD > 0 ? fmtD(schedMD) : '—'}
+                  </td>
+                  <td
+                    className={`${tdCls} text-right font-mono ${actMD ? 'text-blue-700 font-semibold' : 'text-gray-400'}`}
+                  >
+                    {actMD == null ? '—' : fmtD(actMD)}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    {(estMD > 0 || actMD > 0) && (
+                    {mdDelta != null && (estMD > 0 || actMD > 0) && (
                       <span
-                        className={`text-[11px] font-semibold ${mdDelta === 0 ? 'text-gray-400' : mdDelta > 0 ? 'text-red-500' : 'text-green-600'}`}
+                        className={`text-[11px] font-semibold ${Math.abs(mdDelta) < 0.05 ? 'text-gray-400' : mdDelta > 0 ? 'text-red-500' : 'text-green-600'}`}
                       >
                         {mdDelta > 0 ? '+' : ''}
                         {fmtD(mdDelta)}
@@ -273,9 +300,9 @@ function ModuleTable({ workOrders, scheduleItems, crewMap, laborRate }) {
                   </td>
                   <td className={`${tdCls} text-right`}>{estLab > 0 ? fmt(estLab) : '—'}</td>
                   <td
-                    className={`${tdCls} text-right ${actLab > 0 ? 'font-semibold text-blue-700' : 'text-gray-400'}`}
+                    className={`${tdCls} text-right ${actLab ? 'font-semibold text-blue-700' : 'text-gray-400'}`}
                   >
-                    {actLab > 0 ? fmt(actLab) : '—'}
+                    {actLab == null ? '—' : fmt(actLab)}
                   </td>
                   <td className={`${tdCls} text-right`}>{estMat > 0 ? fmt(estMat) : '—'}</td>
                   <td className="px-3 py-2">
@@ -301,6 +328,9 @@ function ModuleTable({ workOrders, scheduleItems, crewMap, laborRate }) {
                 Totals
               </td>
               <td className="px-3 py-2 text-sm text-right font-mono">{fmtD(totEstMD)}</td>
+              <td className="px-3 py-2 text-sm text-right font-mono text-gray-600">
+                {totSchedMD > 0 ? fmtD(totSchedMD) : '—'}
+              </td>
               <td className="px-3 py-2 text-sm text-right font-mono text-blue-700">
                 {totActMD > 0 ? fmtD(totActMD) : '—'}
               </td>
@@ -1269,7 +1299,7 @@ export default function JobComparison({ job }) {
             workOrders={workOrders}
             scheduleItems={scheduleItems}
             crewMap={crewMap}
-            laborRate={laborRate}
+            profitRows={profit?.rows || []}
           />
         )}
         {section === 'breakdown' && <AccountingPanel bills={bills} invoices={invoices} />}
