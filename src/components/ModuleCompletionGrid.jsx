@@ -246,8 +246,8 @@ export default function ModuleCompletionGrid({
                   </span>
                 </th>
               ))}
-              <th className="py-2 px-4 text-right font-bold">Complete</th>
-              <th className="py-2 px-4 text-right font-bold">GP earned</th>
+              <th className="py-2 px-4 text-center font-bold">GP Earned</th>
+              <th className="py-2 px-4 text-center font-bold">Complete</th>
             </tr>
           </thead>
           <tbody>
@@ -303,7 +303,10 @@ export default function ModuleCompletionGrid({
                       </td>
                     )
                   })}
-                  <td className="py-2 px-4 text-right">
+                  <td className="py-2 px-4 text-center tabular-nums font-semibold text-green-700">
+                    {row ? fmt(row.earnedLaborGp + (row.earnedSubGp || 0)) : '—'}
+                  </td>
+                  <td className="py-2 px-4 text-center">
                     <span
                       className={`text-sm font-bold ${
                         row && row.completionPct >= 1 ? 'text-green-700' : 'text-gray-400'
@@ -311,9 +314,6 @@ export default function ModuleCompletionGrid({
                     >
                       {row && row.completionPct >= 1 ? 'Yes' : 'No'}
                     </span>
-                  </td>
-                  <td className="py-2 px-4 text-right tabular-nums font-semibold text-green-700">
-                    {row ? fmt(row.earnedLaborGp + (row.earnedSubGp || 0)) : '—'}
                   </td>
                 </tr>
               )
@@ -346,7 +346,15 @@ export default function ModuleCompletionGrid({
                   </td>
                 )
               })}
-              <td className="py-2 px-4 text-right">
+              <td className="py-2 px-4 text-center tabular-nums font-bold text-green-700">
+                {fmt(
+                  (rows || []).reduce(
+                    (sum, r) => sum + r.earnedLaborGp + (r.earnedSubGp || 0),
+                    0
+                  )
+                )}
+              </td>
+              <td className="py-2 px-4 text-center">
                 <span
                   className={`text-sm font-bold ${
                     jobCumAt(week[6]) >= 99.995 ? 'text-green-700' : 'text-gray-400'
@@ -354,14 +362,6 @@ export default function ModuleCompletionGrid({
                 >
                   {jobCumAt(week[6]) >= 99.995 ? 'Yes' : 'No'}
                 </span>
-              </td>
-              <td className="py-2 px-4 text-right tabular-nums font-bold text-green-700">
-                {fmt(
-                  (rows || []).reduce(
-                    (sum, r) => sum + r.earnedLaborGp + (r.earnedSubGp || 0),
-                    0
-                  )
-                )}
               </td>
             </tr>
           </tbody>

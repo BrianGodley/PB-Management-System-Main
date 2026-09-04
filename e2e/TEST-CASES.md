@@ -755,3 +755,10 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   module rows and the job total.
 - The Overall / By Crew toggle lifted from `JobComparison` into `JobsList`, sharing the
   breadcrumb row with "Tracking / <job>". `JobComparison` takes `view` as a prop.
+
+## Completion grid — GP Earned before Complete
+
+- GP Earned moved to the LEFT of Complete, and both columns centre their values under their
+  headings (module rows and the job total alike). Previously both were right-aligned, so the
+  figures drifted away from the titles above them.
+- "GP earned" retitled "GP Earned" for consistency with the other headings.
