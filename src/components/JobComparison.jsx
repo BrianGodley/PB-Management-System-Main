@@ -223,7 +223,7 @@ function ModuleTable({ workOrders, crewMap, profitRows }) {
 
   // A reference table people read across, so it carries a size up from the
   // 10px/14px the denser panels use.
-  const thCls = 'px-3 py-2.5 text-center text-xs font-bold text-gray-600 uppercase tracking-wide'
+  const thCls = 'px-3 py-2.5 text-center text-sm font-bold text-gray-600 tracking-wide'
   const tdCls = 'px-3 py-2.5 text-base text-gray-700 text-center'
 
   return (
@@ -253,7 +253,7 @@ function ModuleTable({ workOrders, crewMap, profitRows }) {
               const mdDelta = actMD == null ? null : actMD - estMD
               return (
                 <tr key={wo.id} className="hover:bg-gray-50">
-                  <td className={tdCls}>
+                  <td className={`${tdCls} text-left`}>
                     <span className="font-semibold text-gray-900">{wo.module_type}</span>
                     {wo.project_name && (
                       <span className="text-gray-400 text-xs ml-1">· {wo.project_name}</span>

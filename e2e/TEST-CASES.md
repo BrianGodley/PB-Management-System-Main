@@ -984,3 +984,25 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - PROBE NOTE: two false failures while checking. `Completion %` reads as `COMPLETION %` in
   innerText because the header is uppercased in CSS, and clicking Progress straight after
   another section needed longer than 1.9s to re-render. Both were the test, not the app.
+
+## All Jobs tracking view
+
+- Rebuilt so every row carries the same figures as a single job's black summary bar —
+  estimated vs actual man days, labour cost, gross profit and GLPMD, plus sub gross profit —
+  all from `lib/jobProfit`, so the list and the detail view cannot disagree. Verified:
+  Tester1 reads 37.4→30.4 MD, $9,470→$7,707, $20,570→$22,332, $550→$734, matching its own
+  Tracking page exactly.
+- Completion % per job weights each module by its ESTIMATED MAN DAYS. Where a job's modules
+  share a GPMD this equals the profit weighting the per-job grid uses, since GLPE is man days
+  × GPMD.
+- TWO BUGS FOUND ON FIRST RUN:
+  1. PostgREST caps a response at 1,000 rows. Active jobs carry 10,612 time entries, so the
+     unpaged fetch returned the first tenth and most jobs — Tester1 included — showed no
+     actuals at all. `fetchIn` now pages with `.range()` until exhausted.
+  2. Only 20 of 221 active jobs have completion readings. For the other 201 the engine had
+     hours but nothing earned to set against them, so it reported the entire wage bill as
+     negative profit: the footer read −$172,942. Actuals are now computed only for jobs with
+     completion data; the rest show their estimate and "not tracked", and are excluded from
+     the totals.
+- Module names left-aligned in the breakdown; its headers are sentence case rather than
+  uppercase.
