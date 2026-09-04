@@ -96,13 +96,15 @@ function Pair({
         ? 'text-red-400'
         : 'text-green-400'
   return (
-    <div className="flex-1 min-w-0 px-3 py-1.5">
-      <div className="flex items-start justify-between gap-3 min-w-0">
-        <div className="min-w-0">
+    <div className="flex-1 min-w-0 px-3 xl:px-8 2xl:px-14 py-1.5">
+      <div className="flex items-start justify-between gap-3 xl:gap-5 2xl:gap-6 min-w-0">
+        {/* Each half centres on itself, so the figure sits under the middle of
+            its own label rather than flush to the group's outer edges. */}
+        <div className="min-w-0 text-center">
           <p className="text-[10px] font-bold text-gray-300 truncate">{estLabel}</p>
           <p className="text-sm font-bold text-white tabular-nums truncate">{display(est)}</p>
         </div>
-        <div className="text-right min-w-0">
+        <div className="min-w-0 text-center">
           <p className="text-[10px] font-bold text-gray-300 truncate">{actLabel}</p>
           {unknown ? (
             <p className="text-sm font-bold text-gray-500 truncate" title={unknownNote}>

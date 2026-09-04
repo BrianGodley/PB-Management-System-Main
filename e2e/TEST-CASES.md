@@ -673,3 +673,11 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   width. Subcontractors and Materials share the row beneath. Verified 0 of 12 labels clipped
   by comparing scrollWidth against clientWidth rather than by eye.
 - Single-column values centred to match their centred labels.
+
+## Summary bar — inset and centring
+
+- In House Labor cells inset to `px-14` at 2xl, stepping down `xl:px-8` and `px-3` below.
+  A fixed px-14 truncated four labels at 1280px; scaling it means the PADDING gives way on a
+  narrower window rather than the words. Verified 0 of 12 truncated at 1440px and above.
+- Each half of a pair centres on itself, so the figure sits under the middle of its own
+  label instead of flush against the group's outer border.
