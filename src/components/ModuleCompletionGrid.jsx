@@ -145,6 +145,7 @@ export default function ModuleCompletionGrid({
   rows,
   onChange,
   weekOf,
+  series = [],
   jobStartDate = null,
 }) {
   const { user } = useAuth()
@@ -179,15 +180,17 @@ export default function ModuleCompletionGrid({
   }
   // Weighted by what each module is worth in profit, so finishing a big module
   // moves the job figure more than finishing a small one.
-  // What each module is worth in profit: its labour GP plus the sub GP riding on
-  // it. Both are earned by the same completion percentage, and the row's total
-  // cell already sums both — so the day columns weight by the same figure.
-  const worthOf = m =>
-    (parseFloat(m.gross_profit) || 0) + (parseFloat(m.data?.calc?.subGp) || 0)
-  const glpeTotal = (modules || []).reduce((sum, m) => sum + worthOf(m), 0)
-  // Dollars of profit banked as at a date.
-  const jobEarnedAt = date =>
-    (modules || []).reduce((sum, m) => sum + (cumAt(m.id, date) / 100) * worthOf(m), 0)
+  // Profit banked as at a date, straight from the engine — completion x estimate
+  // LESS the labour cost variance, which is what the summary bar reports. The
+  // grid used to compute the worth alone and so read high by whatever the crew
+  // had saved or overspent.
+  const byDate = useMemo(() => {
+    const m = new Map()
+    for (const d of series || []) m.set(d.date, d)
+    return m
+  }, [series])
+  const jobEarnedAt = date => byDate.get(date)?.totalGp ?? 0
+  const producedOn = date => byDate.get(date)?.producedToday ?? 0
 
   const cellValue = (moduleId, date) => {
     const row = (completions || []).find(
@@ -356,7 +359,7 @@ export default function ModuleCompletionGrid({
             <tr className="bg-gray-50/60 border-t-2 border-gray-200">
               <td className="py-2 px-4 font-bold text-gray-700">Weekly Job Gross Profit Earned</td>
               {week.map(d => {
-                const gained = jobEarnedAt(d) - jobEarnedAt(prevDay(d))
+                const gained = producedOn(d)
                 return (
                   <td key={d} className="py-2 px-1 text-center">
                     <span
@@ -370,7 +373,7 @@ export default function ModuleCompletionGrid({
                 )
               })}
               <td className="py-2 px-4 text-center tabular-nums font-bold text-green-700">
-                {fmt(jobEarnedAt(week[6]) - jobEarnedAt(prevDay(week[0])))}
+                {fmt((series || []).reduce((sum, d) => sum + d.producedToday, 0))}
               </td>
             </tr>
 

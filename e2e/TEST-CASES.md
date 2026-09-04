@@ -932,3 +932,18 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - The panel and the bar both print man days beside the hours so the figure can be checked at
   a glance. Verified across three jobs — bar, breakdown and payroll agree exactly:
   Tester1 30.4 · Active5 19.9 · Tester11 53.6.
+
+## Progress grid totals reconcile with the summary bar
+
+- The grid computed its running total as completion × estimate — what the work is WORTH —
+  while the bar reports what was PRODUCED, that figure less the labour cost variance. On
+  Test Tester1 they differed by exactly the $1,763 the crew came in under budget. The grid
+  now reads `dailySeries()` from the engine, so both come from one calculation.
+- Second cause on the same complaint: the Subcontractors card showed the CONTRACTED sub GP
+  while everything else counts what is earned. Test Active1's sub-carrying modules are at 0%,
+  so the card read $1,186 against the grid's $0. It now reports earned sub profit.
+- Verified across five jobs, finished and in-flight: Tester1 $26,140, Active1 $7,811,
+  Active3 $6,264, Active5 $5,910, Tester11 $14,870 — bar and grid agree on all.
+- KNOWN GAP: `sub_cost_change` is subtracted on the card but the engine's series does not
+  know about it, so setting one would reopen a difference of that amount. Nothing carries a
+  cost change today.

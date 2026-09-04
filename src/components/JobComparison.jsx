@@ -5,6 +5,7 @@ import {
   jobProfitAsOf,
   attributeHoursByModule,
   splitHours,
+  dailySeries,
   weekDates,
 } from '../lib/jobProfit'
 import ModuleCompletionGrid, { WeekPicker, weekBounds } from './ModuleCompletionGrid'
@@ -1056,6 +1057,25 @@ export default function JobComparison({ job }) {
         : null,
     [estModules, completions, timeEntries, rates, attribution]
   )
+  // Profit banked at the end of each day of the shown week, from the same engine
+  // as the summary bar. The grid used to compute this itself as completion x
+  // estimate, which is what the work is WORTH — the bar reports what was
+  // PRODUCED, that figure less the labour cost variance. On Test Tester1 the two
+  // differed by exactly the $1,763 the crew came in under budget.
+  const weekSeries = useMemo(
+    () =>
+      rates
+        ? dailySeries({
+            modules: estModules,
+            completions,
+            timeEntries,
+            rates,
+            dates: weekDates(weekOf),
+          })
+        : [],
+    [estModules, completions, timeEntries, rates, weekOf]
+  )
+
   // A sub revising their own quote, outside of any change order. Positive means
   // the sub now costs MORE, which comes straight off subcontractor gross profit
   // — the sale price does not move, so the difference is profit either way.
@@ -1207,9 +1227,13 @@ export default function JobComparison({ job }) {
               }
               hint="The sub revised their quote outside of a change order. Positive costs more and reduces gross profit."
             />
+            {/* EARNED to date, not the contracted total — every other figure on
+                this page counts what has actually been produced, and a job whose
+                sub-carrying modules are untouched has earned none of it. Test
+                Active1 read $1,186 here against $0 in the progress grid. */}
             <Single
               label="Gross Profit"
-              value={(profit ? profit.subTotal : 0) - subCostChange}
+              value={(profit ? profit.subEarned : 0) - subCostChange}
               currency
               tone="text-green-400"
             />
@@ -1287,6 +1311,7 @@ export default function JobComparison({ job }) {
             rows={profit?.rows || []}
             onChange={setCompletions}
             weekOf={weekOf}
+            series={weekSeries}
             jobStartDate={jobStart}
           />
         )}
