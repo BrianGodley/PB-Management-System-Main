@@ -638,3 +638,13 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   `profit.earned`), with a "due by now" line under the estimate.
 - Verified: Active1 (lean, 0.92) green on all three — 16.1 MD against 17.5 due. Active5
   (stalled, 1.30) red on all three — 19.9 MD against 15.3 due, $296/MD against $475.
+
+## Summary bar — dark theme matching the estimator
+
+- The three groups now sit on `bg-gray-900` with `divide-white/10` separators and coloured
+  borders, the same treatment as the estimator's GPMD bar, so the two screens read as one
+  system. Headings keep their light-page accents (blue-700 / orange-600 / amber-600) above
+  the dark boxes, as the estimator does.
+- Tones shift one step lighter on black: `text-green-400` / `text-red-400` rather than
+  `-700` / `-600`, values in white, labels `text-gray-400`, and the muted states
+  ("not yet known", "no markup set", "due by now") in `text-gray-500`.

@@ -61,13 +61,27 @@ function DeltaBadge({ est, act, currency = false, inverse = false }) {
 }
 
 // ─── Summary bar ─────────────────────────────────────────────────────────────
-// Three encapsulated groups, matching the estimator's bar so the two screens
-// read the same way: In House Labor, Subcontractors, Materials. Materials sits
-// apart because it is the one vertical that cannot be known until the bills
-// land, and mixing it with labour is what made the old single row confusing.
+// Three encapsulated groups on a dark ground, matching the estimator's GPMD bar
+// so the two screens read as one system: In House Labor (blue), Subcontractors
+// (orange), Materials (amber). Materials sits apart because it is the one
+// vertical that cannot be known until the bills land.
+//
+// On black, the tones shift a step lighter than they would on white —
+// green-400 and red-400 rather than -700 and -600 — or the values go muddy.
 
 // A metric with an estimated and an actual side.
-function Pair({ label, est, act, currency = false, inverse = false, unknown = false, unknownNote, estSub, actSub, actColor, expected = null }) {
+function Pair({
+  label,
+  est,
+  act,
+  currency = false,
+  inverse = false,
+  unknown = false,
+  unknownNote,
+  estSub,
+  actSub,
+  expected = null,
+}) {
   const display = v => (currency ? fmt(v) : fmtD(v))
   // Colour against what SHOULD have been used by this point, not against the
   // full estimate. A job 48% complete has spent 48% of its budget by design;
@@ -77,31 +91,32 @@ function Pair({ label, est, act, currency = false, inverse = false, unknown = fa
   // `inverse` marks a metric where spending LESS is the good outcome.
   const bad = inverse ? delta > 0 : delta < 0
   const tone =
-    actColor ||
-    (delta == null || Math.abs(delta) < 0.005
-      ? 'text-gray-900'
+    delta == null || Math.abs(delta) < 0.005
+      ? 'text-white'
       : bad
-        ? 'text-red-600'
-        : 'text-green-700')
+        ? 'text-red-400'
+        : 'text-green-400'
   return (
-    <div className="flex-1 min-w-0 px-3 py-2">
-      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide truncate">{label}</p>
+    <div className="flex-1 min-w-0 px-3 py-1.5">
+      <p className="text-[10px] text-gray-400 truncate">{label}</p>
       <div className="flex items-start justify-between gap-2 mt-0.5 min-w-0">
         <div className="min-w-0">
-          <p className="text-[10px] text-gray-400">Est</p>
-          <p className="text-sm font-bold text-gray-800 tabular-nums truncate">{display(est)}</p>
-          {estSub && <p className="text-[10px] text-gray-400 tabular-nums">{estSub}</p>}
+          <p className="text-[9px] text-gray-500 uppercase tracking-wide">Est</p>
+          <p className="text-sm font-bold text-white tabular-nums truncate">{display(est)}</p>
+          {estSub && <p className="text-[10px] text-gray-500 tabular-nums truncate">{estSub}</p>}
         </div>
         <div className="text-right min-w-0">
-          <p className="text-[10px] text-gray-400">Actual</p>
+          <p className="text-[9px] text-gray-500 uppercase tracking-wide">Actual</p>
           {unknown ? (
-            <p className="text-sm font-bold text-gray-400 truncate" title={unknownNote}>
+            <p className="text-sm font-bold text-gray-500 truncate" title={unknownNote}>
               not yet known
             </p>
           ) : (
             <p className={`text-sm font-bold tabular-nums truncate ${tone}`}>{display(act)}</p>
           )}
-          {actSub && !unknown && <p className={`text-[10px] tabular-nums ${tone}`}>{actSub}</p>}
+          {actSub && !unknown && (
+            <p className={`text-[10px] tabular-nums truncate ${tone}`}>{actSub}</p>
+          )}
         </div>
       </div>
     </div>
@@ -109,12 +124,12 @@ function Pair({ label, est, act, currency = false, inverse = false, unknown = fa
 }
 
 // A metric with one value — used where estimated and actual are the same thing.
-function Single({ label, value, currency = false, unknown = false, unknownNote, tone = 'text-gray-900', note }) {
+function Single({ label, value, currency = false, unknown = false, unknownNote, tone = 'text-white', note }) {
   return (
-    <div className="flex-1 min-w-0 px-3 py-2">
-      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide truncate">{label}</p>
+    <div className="flex-1 min-w-0 px-3 py-1.5 self-center">
+      <p className="text-[10px] text-gray-400 truncate">{label}</p>
       {unknown ? (
-        <p className="text-sm font-bold text-gray-400 mt-0.5 truncate" title={unknownNote}>
+        <p className="text-sm font-bold text-gray-500 mt-0.5 truncate" title={unknownNote}>
           not yet known
         </p>
       ) : (
@@ -122,7 +137,7 @@ function Single({ label, value, currency = false, unknown = false, unknownNote, 
           {currency ? fmt(value) : fmtD(value)}
         </p>
       )}
-      {note && <p className="text-[10px] text-gray-400 truncate">{note}</p>}
+      {note && <p className="text-[10px] text-gray-500 truncate">{note}</p>}
     </div>
   )
 }
@@ -130,10 +145,14 @@ function Single({ label, value, currency = false, unknown = false, unknownNote, 
 function Group({ title, accent, grow, children }) {
   return (
     <div className={`min-w-0 flex flex-col ${grow}`}>
-      <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 px-1 ${accent.text}`}>
+      <p
+        className={`text-[10px] font-bold uppercase tracking-wider mb-1 px-1 text-center truncate ${accent.text}`}
+      >
         {title}
       </p>
-      <div className={`flex-1 flex items-stretch divide-x divide-gray-100 rounded-xl border-2 bg-white ${accent.border}`}>
+      <div
+        className={`flex-1 flex items-stretch divide-x divide-white/10 rounded-lg border bg-gray-900 py-1 px-1 ${accent.border}`}
+      >
         {children}
       </div>
     </div>
@@ -1049,7 +1068,7 @@ export default function JobComparison({ job }) {
               <Group
                 title="In House Labor"
                 grow="lg:flex-[6_1_0%]"
-                accent={{ text: 'text-blue-700', border: 'border-blue-300' }}
+                accent={{ text: 'text-blue-700', border: 'border-blue-400/70' }}
               >
                 <Pair
                   label="Man Days"
@@ -1088,7 +1107,7 @@ export default function JobComparison({ job }) {
               <Group
                 title="Subcontractors"
                 grow="lg:flex-[3_1_0%]"
-                accent={{ text: 'text-orange-600', border: 'border-orange-300' }}
+                accent={{ text: 'text-orange-600', border: 'border-orange-400/70' }}
               >
                 {/* Sub costs are fixed at estimate, so there is no estimated-vs-
                     actual to draw. The earned note is the only thing that moves. */}
@@ -1097,7 +1116,7 @@ export default function JobComparison({ job }) {
                   label="Gross Profit"
                   value={profit ? profit.subTotal : 0}
                   currency
-                  tone="text-green-700"
+                  tone="text-green-400"
                   note={
                     profit && profit.subTotal > 0
                       ? `${fmt(profit.subEarned)} earned so far`
@@ -1109,7 +1128,7 @@ export default function JobComparison({ job }) {
               <Group
                 title="Materials"
                 grow="lg:flex-[4_1_0%]"
-                accent={{ text: 'text-amber-700', border: 'border-amber-300' }}
+                accent={{ text: 'text-amber-600', border: 'border-amber-400/70' }}
               >
                 <Single label="Estimated Cost" value={c.estMaterialCost} currency />
                 <Single
@@ -1123,7 +1142,7 @@ export default function JobComparison({ job }) {
                   label="Gross Profit"
                   value={materialGp}
                   currency
-                  tone={materialGp > 0 ? 'text-green-700' : 'text-gray-400'}
+                  tone={materialGp > 0 ? 'text-green-400' : 'text-gray-500'}
                   note={materialGp === 0 ? 'no markup set' : undefined}
                 />
               </Group>
