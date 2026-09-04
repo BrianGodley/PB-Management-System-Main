@@ -852,3 +852,11 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   `text-base font-semibold`, project names `text-sm`, the MD/est. line `text-xs`.
 - Table measured at 1300px inside a 1300px pane after every enlargement — it fills the width
   exactly without forcing a horizontal scrollbar. Worth re-checking if anything else grows.
+
+## Completion grid — week label centred by construction
+
+- The week label moved out of the chooser row and into the table as a `th colSpan={7}`
+  above the day names. CSS centring meant guessing where the day columns sat, and the guess
+  went stale every time a column width changed — it was 7px off before the entry boxes grew
+  and further off after. A colSpan is centred over exactly those seven columns by
+  construction. Measured at 0px offset.

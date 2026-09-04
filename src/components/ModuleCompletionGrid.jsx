@@ -189,7 +189,7 @@ export default function ModuleCompletionGrid({
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="relative flex items-center gap-3 px-4 py-2.5 border-b border-gray-100 flex-wrap">
+      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-100 flex-wrap">
         <div className="flex items-center gap-2">
           {dataWeeks.first && (
             <button
@@ -263,12 +263,6 @@ export default function ModuleCompletionGrid({
             Next ›
           </button>
         </div>
-        {/* Absolutely centred on the ROW, not on the space left over beside the
-            controls — flex-1 text-center pushed it right of the day columns by
-            however wide the buttons happened to be. */}
-        <p className="absolute left-1/2 -translate-x-1/2 text-base font-semibold text-gray-700 pointer-events-none">
-          {atCeiling ? 'Current Week' : atFloor ? 'Job Sold This Week' : 'Previous Week'}
-        </p>
       </div>
 
       {error && <p className="px-4 py-2 text-xs text-red-600 bg-red-50">{error}</p>}
@@ -276,6 +270,16 @@ export default function ModuleCompletionGrid({
       <div className="overflow-x-auto thin-scroll">
         <table className="w-full text-sm min-w-[820px]">
           <thead>
+            <tr>
+              <th />
+              <th
+                colSpan={7}
+                className="pt-2 pb-1 text-center text-base font-semibold text-gray-700"
+              >
+                {atCeiling ? 'Current Week' : atFloor ? 'Job Sold This Week' : 'Previous Week'}
+              </th>
+              <th />
+            </tr>
             <tr className="text-left text-[10px] text-black uppercase tracking-wide border-b border-gray-100">
               <th className="py-2 px-4 font-bold">Module</th>
               {week.map((d, i) => (
