@@ -126,14 +126,21 @@ function Pair({
 // A metric with one value — used where estimated and actual are the same thing.
 function Single({ label, value, currency = false, unknown = false, unknownNote, tone = 'text-white', note }) {
   return (
-    <div className="flex-1 min-w-0 px-3 py-1.5 self-center">
+    <div className="flex-1 min-w-0 px-3 py-1.5">
       <p className="text-[10px] font-bold text-gray-300 text-center truncate">{label}</p>
+      {/* Single had `self-center`, which floated its label to the middle of the
+          group while the Pair labels sat at the top. Both now start at the top,
+          and this spacer stands in for the EST/ACTUAL row so the VALUES line up
+          across all three groups too, not just the headings. */}
+      <p className="text-[9px] uppercase tracking-wide mt-0.5" aria-hidden="true">
+        &nbsp;
+      </p>
       {unknown ? (
-        <p className="text-sm font-bold text-gray-500 mt-0.5 truncate" title={unknownNote}>
+        <p className="text-sm font-bold text-gray-500 truncate" title={unknownNote}>
           not yet known
         </p>
       ) : (
-        <p className={`text-sm font-bold tabular-nums mt-0.5 truncate ${tone}`}>
+        <p className={`text-sm font-bold tabular-nums truncate ${tone}`}>
           {currency ? fmt(value) : fmtD(value)}
         </p>
       )}
