@@ -144,6 +144,53 @@ function Single({ label, value, currency = false, unknown = false, unknownNote, 
 // inside one long bar. Four estimated/actual pairs read better as four objects
 // than as eight figures behind hairlines — the card edge does the grouping that
 // spacing alone was struggling to do.
+// A single value the user can type into. Click to edit, Enter or blur to save,
+// Escape to abandon — the same interaction as the estimator's markup boxes.
+function EditableSingle({ label, value, onSave, tone = 'text-white', hint }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const start = () => {
+    setDraft(value ? String(value) : '')
+    setEditing(true)
+  }
+  const commit = () => {
+    const raw = draft.trim()
+    // Empty clears the adjustment rather than storing NaN.
+    const next = raw === '' ? 0 : parseFloat(raw)
+    setEditing(false)
+    if (Number.isFinite(next) && next !== value) onSave(next)
+  }
+  return (
+    <div className="flex-1 min-w-0 px-3 py-1.5">
+      <p className="text-[10px] font-bold text-gray-300 text-center truncate">{label}</p>
+      {editing ? (
+        <input
+          autoFocus
+          type="number"
+          step="0.01"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={e => {
+            if (e.key === 'Enter') commit()
+            if (e.key === 'Escape') setEditing(false)
+          }}
+          className="w-full bg-gray-800 border border-orange-400 rounded text-orange-200 text-sm font-bold text-center tabular-nums outline-none px-1"
+        />
+      ) : (
+        <p
+          onClick={start}
+          title={hint}
+          className={`text-sm font-bold tabular-nums text-center truncate cursor-pointer hover:text-orange-300 transition-colors ${tone}`}
+        >
+          {value ? `${value > 0 ? '+' : ''}${fmt(value)}` : '—'}
+          <span className="text-orange-500 text-[10px] ml-1">✎</span>
+        </p>
+      )}
+    </div>
+  )
+}
+
 function Group({ title, accent, grow, children, cards = false }) {
   return (
     <div className={`min-w-0 flex flex-col ${grow}`}>
@@ -996,6 +1043,21 @@ export default function JobComparison({ job }) {
         : null,
     [estModules, completions, timeEntries, rates, attribution]
   )
+  // A sub revising their own quote, outside of any change order. Positive means
+  // the sub now costs MORE, which comes straight off subcontractor gross profit
+  // — the sale price does not move, so the difference is profit either way.
+  const subCostChange = nv(job?.sub_cost_change)
+  async function saveSubCostChange(next) {
+    const { error } = await supabase
+      .from('jobs')
+      .update({ sub_cost_change: next })
+      .eq('id', job.id)
+    if (!error) {
+      job.sub_cost_change = next // the row is owned by the parent list
+      fetchAll()
+    }
+  }
+
   const materialGp = useMemo(
     () =>
       estModules.reduce(
@@ -1137,14 +1199,19 @@ export default function JobComparison({ job }) {
               <div className="flex flex-col lg:flex-row gap-3 items-stretch">
               <Group
                 title="Subcontractors"
-                grow="lg:flex-[2_1_0%]"
+                grow="lg:flex-[3_1_0%]"
                 accent={{ text: 'text-orange-600', border: 'border-orange-400/70' }}
               >
-                {/* Sub cost is fixed at estimate, so profit is the only figure
-                    here that a tracking view can say anything about. */}
+                <EditableSingle
+                  label="Cost Change +/-"
+                  value={subCostChange}
+                  onSave={saveSubCostChange}
+                  tone={subCostChange > 0 ? 'text-red-400' : subCostChange < 0 ? 'text-green-400' : 'text-gray-500'}
+                  hint="The sub revised their quote outside of a change order. Positive costs more and reduces gross profit."
+                />
                 <Single
                   label="Gross Profit"
-                  value={profit ? profit.subTotal : 0}
+                  value={(profit ? profit.subTotal : 0) - subCostChange}
                   currency
                   tone="text-green-400"
                 />

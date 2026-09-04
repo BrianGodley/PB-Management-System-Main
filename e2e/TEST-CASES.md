@@ -701,3 +701,19 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   estimated and actual, against a hard card boundary either side. Edge-to-edge (px-4) read
   as two unrelated figures again; centred (px-2) wasted the tile.
 - Verified 0 of 12 labels truncated at 1600px, no page errors.
+
+## Subcontractors — Cost Change +/-
+
+- `jobs.sub_cost_change numeric default 0` added (staging). A sub revising their own quote
+  OUTSIDE of a change order. Positive = the sub now costs more.
+- It comes straight off subcontractor gross profit, one-for-one: the sale price does not
+  move, so any cost change is profit either way. Verified in the browser — Active1's sub GP
+  went $1,186 → $686 on a +$500 entry.
+- Editable in place: click the value, Enter or blur saves, Escape abandons, empty clears to
+  zero rather than storing NaN. Same interaction as the estimator's markup boxes. Shows an
+  em dash when unset, red when positive (costs more), green when negative.
+- JOB-LEVEL, not per module. Subs are per module in the estimate, so this trades attribution
+  for simplicity on a field described as rarely used — worth revisiting if it turns out to be
+  used often, or on jobs carrying several subs.
+- PROD SQL still outstanding for this column along with module_completion and
+  company_settings.overtime_multiplier.
