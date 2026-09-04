@@ -773,3 +773,11 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - Every week is named now, not just the two boundaries: **Current Week** at the ceiling,
   **Job Sold This Week** at the floor, **Previous Week** for anything between. All three
   verified by navigating in the browser.
+
+## Completion grid — the week picker stops jumping
+
+- The date range sized to its content, so the Next button slid sideways whenever the week
+  changed: "8/30/2026 – 9/5/2026" is wider than "8/9/2026 – 8/15/2026". The range is now a
+  fixed `w-52`, centred, sized for the widest case (12/28/2026 – 1/3/2027).
+- Verified by walking back through four weeks and reading the Next button's x each time:
+  703px throughout.

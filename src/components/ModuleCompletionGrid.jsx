@@ -211,7 +211,12 @@ export default function ModuleCompletionGrid({
           >
             ‹ Prev
           </button>
-          <span className="text-xs text-gray-600 tabular-nums whitespace-nowrap">
+          {/* Fixed width: the range is 19–22 characters depending on the month
+              and day digits, and letting it size to content shifted the Next
+              button sideways every time the week changed. Sized for the widest
+              case (12/28/2026 – 1/3/2027) and centred, so the buttons hold
+              still and the dates sit apart inside the gap. */}
+          <span className="w-52 shrink-0 text-center text-xs text-gray-600 tabular-nums whitespace-nowrap">
             {usDate(week[0])} – {usDate(week[6])}
           </span>
           <button
