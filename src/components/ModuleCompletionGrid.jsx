@@ -363,10 +363,36 @@ export default function ModuleCompletionGrid({
                 </tr>
               )
             })}
+            {/* What each day of THIS week produced — the change in banked profit
+                from the previous day. The row below carries the running total;
+                this one answers "what did we make on Tuesday?". A day can come
+                out negative when a PM restates an earlier reading downward. */}
+            <tr className="bg-gray-50/60 border-t-2 border-gray-200">
+              <td className="py-2 px-4 font-bold text-gray-700">Weekly Job Gross Profit Earned</td>
+              {week.map(d => {
+                const gained = jobEarnedAt(d) - jobEarnedAt(prevDay(d))
+                return (
+                  <td key={d} className="py-2 px-1 text-center">
+                    <span
+                      className={`text-sm font-bold tabular-nums ${
+                        gained > 0.5 ? 'text-green-700' : gained < -0.5 ? 'text-red-600' : 'text-gray-300'
+                      }`}
+                    >
+                      {Math.abs(gained) < 0.5 ? '—' : fmt(gained)}
+                    </span>
+                  </td>
+                )
+              })}
+              <td className="py-2 px-4 text-center tabular-nums font-bold text-green-700">
+                {fmt(jobEarnedAt(week[6]) - jobEarnedAt(prevDay(week[0])))}
+              </td>
+              <td className="py-2 px-4" />
+            </tr>
+
             {/* Job total — every module's cumulative reading weighted by its
                 estimated profit. Modules run in sequence and sometimes overlap;
                 this is the line that shows the job as a whole marching to 100%. */}
-            <tr className="bg-gray-50 border-t-2 border-gray-200">
+            <tr className="bg-gray-50 border-t border-gray-200">
               <td className="py-2 px-4 font-bold text-gray-700">Total Job Gross Profit Earned</td>
               {week.map(d => {
                 const cum = jobCumAt(d)

@@ -820,3 +820,14 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   cell summed labour + sub, so the two would disagree as soon as a module carrying a sub was
   part-finished. Both now use labour + sub. On Active1 that moves the reading from
   $7,454 ÷ $15,555 = 48% to $7,455 ÷ $16,741 = 45% — same dollars, larger denominator.
+
+## Completion grid — Weekly Job Gross Profit Earned
+
+- A row directly above Total Job Gross Profit Earned, showing what each day of THIS week
+  produced: the change in banked profit from the previous day. Its right-hand cell carries
+  the week's total.
+- Days with no movement show an em dash rather than $0 — nothing happened is different from
+  earning nothing. A day CAN come out negative and prints red, which is what a PM restating
+  an earlier reading downward looks like.
+- Verified the two rows tie: $35 + $176 + $564 + $636 + $954 = $2,366, matching the total
+  row's movement across the week ($5,089 → $7,455).
