@@ -60,82 +60,81 @@ function DeltaBadge({ est, act, currency = false, inverse = false }) {
   )
 }
 
-function KpiCard({ label, est, act, currency = false, unknown = false, unknownNote }) {
-  // act === null means NOT KNOWN YET, which is a different fact from zero.
-  // Material cost with no bills linked is the case that matters: showing $0
-  // reads as "we spent nothing" when it means "we have not been billed yet".
+// ─── Summary bar ─────────────────────────────────────────────────────────────
+// Three encapsulated groups, matching the estimator's bar so the two screens
+// read the same way: In House Labor, Subcontractors, Materials. Materials sits
+// apart because it is the one vertical that cannot be known until the bills
+// land, and mixing it with labour is what made the old single row confusing.
+
+// A metric with an estimated and an actual side.
+function Pair({ label, est, act, currency = false, inverse = false, unknown = false, unknownNote, estSub, actSub, actColor, expected = null }) {
   const display = v => (currency ? fmt(v) : fmtD(v))
+  // Colour against what SHOULD have been used by this point, not against the
+  // full estimate. A job 48% complete has spent 48% of its budget by design;
+  // judging it against 100% paints every open job red for no reason.
+  const against = expected != null ? expected : est
+  const delta = unknown ? null : act - against
+  // `inverse` marks a metric where spending LESS is the good outcome.
+  const bad = inverse ? delta > 0 : delta < 0
+  const tone =
+    actColor ||
+    (delta == null || Math.abs(delta) < 0.005
+      ? 'text-gray-900'
+      : bad
+        ? 'text-red-600'
+        : 'text-green-700')
   return (
-    <div className="bg-white rounded-xl border border-gray-200 px-3 py-2 flex flex-col gap-0.5 min-w-0 overflow-hidden">
-      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide truncate">
-        {label}
-      </span>
+    <div className="flex-1 min-w-0 px-3 py-2">
+      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide truncate">{label}</p>
       <div className="flex items-start justify-between gap-2 mt-0.5 min-w-0">
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] text-gray-400">Estimated</p>
-          <p className="text-sm sm:text-base font-bold text-gray-800 truncate">{display(est)}</p>
+        <div className="min-w-0">
+          <p className="text-[10px] text-gray-400">Est</p>
+          <p className="text-sm font-bold text-gray-800 tabular-nums truncate">{display(est)}</p>
+          {estSub && <p className="text-[10px] text-gray-400 tabular-nums">{estSub}</p>}
         </div>
-        <div className="text-right min-w-0 flex-1">
+        <div className="text-right min-w-0">
           <p className="text-[10px] text-gray-400">Actual</p>
           {unknown ? (
-            <p className="text-sm sm:text-base font-bold text-gray-400 truncate" title={unknownNote}>
+            <p className="text-sm font-bold text-gray-400 truncate" title={unknownNote}>
               not yet known
             </p>
           ) : (
-            <p className="text-sm sm:text-base font-bold text-gray-900 truncate">{display(act)}</p>
+            <p className={`text-sm font-bold tabular-nums truncate ${tone}`}>{display(act)}</p>
           )}
+          {actSub && !unknown && <p className={`text-[10px] tabular-nums ${tone}`}>{actSub}</p>}
         </div>
       </div>
     </div>
   )
 }
 
-// Gross profit PRODUCED — labour + subcontractor, driven by the PM's completion
-// readings and the timeclock. Materials are excluded on purpose: material profit
-// is only knowable when the last bill lands, and counting an unspent budget as
-// profit is exactly the error this card used to make.
-function GpCard({ profit, glpeTotal, glpmde, unavailable }) {
-  if (unavailable) {
-    return (
-      <div className="bg-white rounded-xl border-2 border-amber-300 px-3 py-2 flex flex-col gap-0.5">
-        <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">
-          Gross Profit
-        </span>
-        <p className="text-xs text-amber-800 mt-1 leading-snug">
-          Set the crew rate and overtime multiplier in HR → Labor Rates. No default is
-          assumed.
-        </p>
-      </div>
-    )
-  }
-  // Both sides must count the same things. Actual is labour + sub, so estimated
-  // has to be labour + sub too — comparing GLPE alone against a total that
-  // includes subcontractor profit overstates the gain by the sub GP.
-  const actGP = profit.glpa + profit.subEarned
-  const estGP = glpeTotal + profit.subTotal
-  const delta = actGP - estGP
-  const color = delta > 0 ? 'text-green-700' : delta < 0 ? 'text-red-600' : 'text-gray-500'
-  const trend = delta > 0 ? '📈' : delta < 0 ? '📉' : '➡️'
+// A metric with one value — used where estimated and actual are the same thing.
+function Single({ label, value, currency = false, unknown = false, unknownNote, tone = 'text-gray-900', note }) {
   return (
-    <div className="bg-white rounded-xl border-2 border-green-700 px-3 py-2 flex flex-col gap-0.5">
-      <span className="text-[10px] font-bold text-green-700 uppercase tracking-wide">
-        Gross Profit Produced {trend}
-      </span>
-      <div className="flex items-start justify-between gap-2 mt-0.5">
-        <div>
-          <p className="text-[10px] text-gray-400">Estimated</p>
-          <p className="text-base font-bold text-gray-800">{fmt(estGP)}</p>
-          {glpmde != null && (
-            <p className="text-[10px] text-gray-400">{fmt(glpmde)}/MD</p>
-          )}
-        </div>
-        <div className="text-right">
-          <p className="text-[10px] text-gray-400">Actual</p>
-          <p className={`text-base font-bold ${color}`}>{fmt(actGP)}</p>
-          {profit.glpmda != null && (
-            <p className={`text-[10px] ${color}`}>{fmt(profit.glpmda)}/MD</p>
-          )}
-        </div>
+    <div className="flex-1 min-w-0 px-3 py-2">
+      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide truncate">{label}</p>
+      {unknown ? (
+        <p className="text-sm font-bold text-gray-400 mt-0.5 truncate" title={unknownNote}>
+          not yet known
+        </p>
+      ) : (
+        <p className={`text-sm font-bold tabular-nums mt-0.5 truncate ${tone}`}>
+          {currency ? fmt(value) : fmtD(value)}
+        </p>
+      )}
+      {note && <p className="text-[10px] text-gray-400 truncate">{note}</p>}
+    </div>
+  )
+}
+
+function Group({ title, accent, grow, children }) {
+  return (
+    <div className={`min-w-0 flex flex-col ${grow}`}>
+      <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 px-1 ${accent.text}`}>
+        {title}
+      </p>
+      <div className={`flex-1 flex items-stretch divide-x divide-gray-100 rounded-xl border-2 bg-white ${accent.border}`}>
+        {children}
       </div>
     </div>
   )
@@ -843,7 +842,7 @@ export default function JobComparison({ job }) {
       job.estimate_id
         ? supabase
             .from('estimate_projects')
-            .select('id, project_name, estimate_modules ( * )')
+            .select('id, project_name, material_gp_markup_rate, estimate_modules ( * )')
             .eq('estimate_id', job.estimate_id)
         : Promise.resolve({ data: [] }),
       supabase.from('module_completion').select('*').eq('job_id', job.id),
@@ -862,7 +861,11 @@ export default function JobComparison({ job }) {
     const flatModules = []
     for (const p of projRes.data || []) {
       for (const m of p.estimate_modules || []) {
-        flatModules.push({ ...m, project_name: p.project_name })
+        flatModules.push({
+          ...m,
+          project_name: p.project_name,
+          material_gp_markup_rate: p.material_gp_markup_rate,
+        })
       }
     }
     setEstModules(flatModules)
@@ -957,6 +960,20 @@ export default function JobComparison({ job }) {
         : null,
     [estModules, completions, timeEntries, rates, attribution]
   )
+  // From the estimate modules, so cost and profit come from ONE source. The
+  // work_orders is_subcontractor flag is a different thing and disagreed.
+  const subCostTotal = useMemo(
+    () => estModules.reduce((sum, m) => sum + nv(m.sub_cost), 0),
+    [estModules]
+  )
+  const materialGp = useMemo(
+    () =>
+      estModules.reduce(
+        (sum, m) => sum + nv(m.material_cost) * nv(m.material_gp_markup_rate),
+        0
+      ),
+    [estModules]
+  )
   const glpmde = useMemo(() => {
     const emd = estModules.reduce((s, m) => s + nv(m.man_days), 0)
     return profit && emd > 0 ? profit.glpeTotal / emd : null
@@ -1027,44 +1044,90 @@ export default function JobComparison({ job }) {
           {/* KPI summary cards + payroll bar scroll together with the detail
               below (no longer frozen). */}
           <div className="flex-1 min-h-0 overflow-y-auto space-y-4 mt-4">
-            {/* KPI cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard
-              label="Man Days"
-              est={c.estManDays}
-              act={profit ? profit.actualManDays : c.actManDays}
-              inverse
-              sub={
-                profit
-                  ? `${c.scheduledManDays.toFixed(1)} scheduled · ${(profit.hours.overtime / 8).toFixed(1)} MD overtime`
-                  : `${c.scheduledManDays.toFixed(1)} scheduled`
-              }
-            />
-            <KpiCard
-              label="Labor Cost"
-              est={c.estLaborCost}
-              act={profit ? profit.rlc : c.actLaborCost}
-              currency
-              inverse
-              unknown={!profit}
-              unknownNote="Set the crew rate and overtime multiplier in HR → Labor Rates."
-            />
-            <KpiCard
-              label="Material Cost"
-              est={c.estMaterialCost}
-              act={c.actMaterialCost}
-              currency
-              inverse
-              unknown={bills.length === 0}
-              unknownNote="No vendor bills or card charges are linked to this job yet."
-            />
-            <GpCard
-              profit={profit}
-              glpeTotal={profit?.glpeTotal || 0}
-              glpmde={glpmde}
-              unavailable={!profit}
-            />
-          </div>
+            {/* Summary bar — three groups, mirroring the estimator */}
+            <div className="flex flex-col lg:flex-row gap-3 items-stretch">
+              <Group
+                title="In House Labor"
+                grow="lg:flex-[6_1_0%]"
+                accent={{ text: 'text-blue-700', border: 'border-blue-300' }}
+              >
+                <Pair
+                  label="Man Days"
+                  est={c.estManDays}
+                  act={profit ? profit.actualManDays : c.actManDays}
+                  inverse
+                  expected={profit ? c.estManDays * profit.jobCompletion : null}
+                  estSub={
+                    profit ? `${(c.estManDays * profit.jobCompletion).toFixed(1)} due by now` : null
+                  }
+                />
+                <Pair
+                  label="Labor Cost"
+                  est={c.estLaborCost}
+                  act={profit ? profit.rlc : c.actLaborCost}
+                  currency
+                  inverse
+                  unknown={!profit}
+                  unknownNote="Set the crew rate and overtime multiplier in HR → Labor Rates."
+                  expected={profit ? profit.elcToDate : null}
+                  estSub={profit ? `${fmt(profit.elcToDate)} due by now` : null}
+                />
+                <Pair
+                  label="Gross Profit Produced"
+                  est={profit ? profit.glpeTotal : 0}
+                  act={profit ? profit.glpa : 0}
+                  currency
+                  unknown={!profit}
+                  unknownNote="Set the crew rate and overtime multiplier in HR → Labor Rates."
+                  expected={profit ? profit.earned : null}
+                  estSub={glpmde != null ? `${fmt(glpmde)}/MD` : null}
+                  actSub={profit?.glpmda != null ? `${fmt(profit.glpmda)}/MD` : null}
+                />
+              </Group>
+
+              <Group
+                title="Subcontractors"
+                grow="lg:flex-[3_1_0%]"
+                accent={{ text: 'text-orange-600', border: 'border-orange-300' }}
+              >
+                {/* Sub costs are fixed at estimate, so there is no estimated-vs-
+                    actual to draw. The earned note is the only thing that moves. */}
+                <Single label="Cost" value={subCostTotal} currency />
+                <Single
+                  label="Gross Profit"
+                  value={profit ? profit.subTotal : 0}
+                  currency
+                  tone="text-green-700"
+                  note={
+                    profit && profit.subTotal > 0
+                      ? `${fmt(profit.subEarned)} earned so far`
+                      : undefined
+                  }
+                />
+              </Group>
+
+              <Group
+                title="Materials"
+                grow="lg:flex-[4_1_0%]"
+                accent={{ text: 'text-amber-700', border: 'border-amber-300' }}
+              >
+                <Single label="Estimated Cost" value={c.estMaterialCost} currency />
+                <Single
+                  label="Actual Cost"
+                  value={c.actMaterialCost}
+                  currency
+                  unknown={bills.length === 0}
+                  unknownNote="No vendor bills or card charges are linked to this job yet."
+                />
+                <Single
+                  label="Gross Profit"
+                  value={materialGp}
+                  currency
+                  tone={materialGp > 0 ? 'text-green-700' : 'text-gray-400'}
+                  note={materialGp === 0 ? 'no markup set' : undefined}
+                />
+              </Group>
+            </div>
 
           {/* The PM's daily completion entry — the one human input the profit
               figures above depend on. The timeclock says what was spent; only a

@@ -618,3 +618,23 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   refuses new input, with a "this day has not happened yet" tooltip.
 - Verified on Test Active1 on Fri 2026-09-04: week 08-30 – 09-05, Next disabled, and 6 of 42
   cells locked — Saturday across all six modules.
+
+## Summary bar — three encapsulated groups
+
+- The four-card row became three bordered groups matching the estimator's bar, so both
+  screens read the same way:
+  - **In House Labor** (blue) — Man Days, Labor Cost, Gross Profit Produced, each est vs
+    actual, with GLPMDE/GLPMDA under the profit pair. Labour ONLY: the old card mixed sub GP
+    into the dollars while the $/MD figure excluded it, so headline and rate disagreed.
+  - **Subcontractors** (orange) — Cost and Gross Profit as single values, since sub cost is
+    fixed at estimate. A note shows how much of that GP is earned so far.
+  - **Materials** (amber) — Estimated Cost, Actual Cost, Gross Profit. Actual reads "not yet
+    known" until a bill is linked; GP reads "no markup set" when the rate is 0.
+- BUG FIXED: sub COST came from `work_orders.is_subcontractor` while sub PROFIT came from the
+  estimate modules — Active1 showed $0 cost against $1,186 profit. Both now read the estimate.
+- BUG FIXED: actuals were coloured against the FULL estimate, so every unfinished job showed
+  red for having spent less than its whole budget. They now compare against what is due at
+  the job's current completion (`estManDays × jobCompletion`, `profit.elcToDate`,
+  `profit.earned`), with a "due by now" line under the estimate.
+- Verified: Active1 (lean, 0.92) green on all three — 16.1 MD against 17.5 due. Active5
+  (stalled, 1.30) red on all three — 19.9 MD against 15.3 due, $296/MD against $475.
