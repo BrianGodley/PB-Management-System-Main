@@ -79,9 +79,9 @@ join public.subs_vendors v
  and v.tenant_id = m.tenant_id
 cross join (values
   ('MAT-fp-fill-red-lava-34', 7.40),
-  ('MAT-fp-fill-black-lava-1-3', 100.00),
-  ('MAT-fp-fill-black-lava-34', 100.00),
-  ('MAT-fp-fill-black-lava-13', 100.00),
+  ('MAT-fp-fill-black-lava-1-3', 12.50),
+  ('MAT-fp-fill-black-lava-34', 12.50),
+  ('MAT-fp-fill-black-lava-13', 12.50),
   ('MAT-fp-fill-barksdale-glass', 45.00),
   ('MAT-fp-fill-deep-sea-blue-glass', 35.00),
   ('MAT-fp-fill-element-fire-glass', 14.00)
@@ -93,6 +93,27 @@ where m.ref_key = i.ref_key
       and mp.vendor_id = v.id
       and mp.effective_end is null
   );
+
+-- 6. Correct any price already loaded at a different figure. Staging took the
+--    black lava rock in at $100 a bag before the real price ($12.50) was known;
+--    that was a typo, not a price change, so the open row is corrected in place
+--    rather than closed and superseded — there is no real history to preserve.
+update public.material_price mp
+set price = i.price
+from public.material m,
+  (values
+    ('MAT-fp-fill-red-lava-34', 7.40),
+    ('MAT-fp-fill-black-lava-1-3', 12.50),
+    ('MAT-fp-fill-black-lava-34', 12.50),
+    ('MAT-fp-fill-black-lava-13', 12.50),
+    ('MAT-fp-fill-barksdale-glass', 45.00),
+    ('MAT-fp-fill-deep-sea-blue-glass', 35.00),
+    ('MAT-fp-fill-element-fire-glass', 14.00)
+  ) as i(ref_key, price)
+where mp.material_id = m.id
+  and mp.effective_end is null
+  and m.ref_key = i.ref_key
+  and mp.price is distinct from i.price;
 
 -- Check: 7 products, each with one open Home Depot price, plus the labor rate.
 select m.description, mp.price,
