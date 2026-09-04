@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { weekDates } from '../lib/jobProfit'
@@ -19,13 +19,36 @@ const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const today = () => new Date().toISOString().slice(0, 10)
 const fmt = v => `$${Math.round(v || 0).toLocaleString()}`
 
-export default function ModuleCompletionGrid({ jobId, modules, completions, rows, onChange }) {
+export default function ModuleCompletionGrid({
+  jobId,
+  modules,
+  completions,
+  rows,
+  onChange,
+  jobStartDate = null,
+}) {
   const { user } = useAuth()
   const [weekOf, setWeekOf] = useState(today())
+  // A job sold in the future (or a clock skew) would otherwise open on a week
+  // before the floor and immediately disable the button the user needs.
+  useEffect(() => {
+    if (!jobStartDate) return
+    const floor = weekDates(String(jobStartDate).slice(0, 10))[0]
+    if (weekDates(weekOf)[0] < floor) setWeekOf(floor)
+  }, [jobStartDate])
   const [saving, setSaving] = useState(null)
   const [error, setError] = useState('')
 
   const week = useMemo(() => weekDates(weekOf), [weekOf])
+
+  // A job cannot have progress before it existed, so the week containing the
+  // sold date is the floor — there is nothing to report in the weeks before it
+  // and letting the navigator run backwards forever only wastes clicks.
+  const floorWeek = useMemo(
+    () => (jobStartDate ? weekDates(String(jobStartDate).slice(0, 10))[0] : null),
+    [jobStartDate]
+  )
+  const atFloor = floorWeek != null && week[0] <= floorWeek
   const earned = useMemo(() => {
     const m = new Map()
     for (const r of rows || []) m.set(r.id, r)
@@ -134,7 +157,11 @@ export default function ModuleCompletionGrid({ jobId, modules, completions, rows
   function shift(days) {
     const d = new Date(`${weekOf}T00:00:00`)
     d.setDate(d.getDate() + days)
-    setWeekOf(d.toISOString().slice(0, 10))
+    const next = d.toISOString().slice(0, 10)
+    // Clamp rather than ignore, so a click at the boundary still lands on the
+    // first week instead of appearing to do nothing.
+    if (floorWeek && weekDates(next)[0] < floorWeek) return setWeekOf(floorWeek)
+    setWeekOf(next)
   }
 
   if (!modules?.length) {
@@ -170,12 +197,17 @@ export default function ModuleCompletionGrid({ jobId, modules, completions, rows
           <button
             type="button"
             onClick={() => shift(-7)}
-            className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
+            disabled={atFloor}
+            title={atFloor ? 'This is the week the job was sold — there is nothing before it.' : undefined}
+            className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
           >
             ‹ Prev
           </button>
           <span className="text-xs text-gray-600 tabular-nums whitespace-nowrap">
             {week[0]} – {week[6]}
+            {atFloor && (
+              <span className="block text-[10px] text-gray-400 text-center">job sold this week</span>
+            )}
           </span>
           <button
             type="button"

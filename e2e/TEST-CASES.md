@@ -592,3 +592,18 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   Hours are now derived from completion: `emd × 8 × (pct/100) × efficiency`.
 - Modules at `None` get no readings and no hours at all — "never started" rather than a
   stored zero.
+
+## Completion grid — the week navigator stops at the sold date
+
+- A job cannot have progress before it existed, so the week containing `jobs.sold_date` is
+  the floor. Prev is disabled there and the range label reads "job sold this week"; the
+  button says why on hover rather than silently doing nothing.
+- `sold_date` is the field to use: 220 of 221 active jobs carry it, against 24 for
+  `actual_start`. Falls back projected_start → actual_start → created_at, and imposes no
+  floor at all when none of them exist.
+- `shift()` CLAMPS to the floor rather than ignoring the click, so a jump from two weeks out
+  still lands on the first week. A mount-time effect clamps too, in case a job is sold in
+  the future or a clock skews — otherwise the grid would open below the floor and instantly
+  disable the button the user needs.
+- Verified on Test Active1 (sold 2026-08-09): three clicks back reach 2026-08-09 – 08-15 and
+  Prev disables.

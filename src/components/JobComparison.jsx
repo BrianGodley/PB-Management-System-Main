@@ -1075,6 +1075,7 @@ export default function JobComparison({ job }) {
             completions={completions}
             rows={profit?.rows || []}
             onChange={setCompletions}
+            jobStartDate={job.sold_date || job.projected_start || job.actual_start || job.created_at}
           />
 
           {/* Payroll hours info row */}
