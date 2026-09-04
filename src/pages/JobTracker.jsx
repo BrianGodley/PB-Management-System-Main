@@ -1,29 +1,50 @@
-import { useState, useEffect } from 'react'
+// ─────────────────────────────────────────────────────────────────────────────
+// Job Tracker — gross profit produced, and the PM's daily completion entry.
+//
+// This page previously read the legacy projects → modules → actual_entries
+// tables, which hold zero modules and zero entries in production; it rendered an
+// empty shell. It now reads the real estimate model through jobs.estimate_id and
+// is the surface where a project manager enters percent complete per module per
+// day — the one human input the whole profit calculation depends on.
+//
+// All arithmetic lives in lib/jobProfit.js so the cross-job PM grid can reuse it.
+// ─────────────────────────────────────────────────────────────────────────────
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import ModuleTrackerRow from '../components/ModuleTrackerRow'
-import GPSummaryCard from '../components/GPSummaryCard'
+import {
+  resolveRates,
+  jobProfitAsOf,
+  dailySeries,
+  attributeHoursByModule,
+  weekDates,
+} from '../lib/jobProfit'
+
+const fmt = v => `$${Math.round(v || 0).toLocaleString()}`
+const fmt2 = v =>
+  `$${(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const pct = v => `${Math.round((v || 0) * 100)}%`
+const today = () => new Date().toISOString().slice(0, 10)
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 export default function JobTracker() {
   const { id } = useParams()
   const { user } = useAuth()
   const [job, setJob] = useState(null)
-  const [laborRate, setLaborRate] = useState(400)
+  const [settings, setSettings] = useState(null)
+  const [modules, setModules] = useState([])
+  const [completions, setCompletions] = useState([])
+  const [timeEntries, setTimeEntries] = useState([])
+  const [crews, setCrews] = useState([])
+  const [scheduleItems, setScheduleItems] = useState([])
+  const [workOrders, setWorkOrders] = useState([])
   const [loading, setLoading] = useState(true)
-  const [logTarget, setLogTarget] = useState(null) // module to log entry for
-  const [logForm, setLogForm] = useState({
-    actual_man_days: '',
-    actual_material_cost: '',
-    entry_date: new Date().toISOString().split('T')[0],
-    notes: '',
-  })
-  const [savingLog, setSavingLog] = useState(false)
-  const [showHistory, setShowHistory] = useState({}) // moduleId -> bool
+  const [weekOf, setWeekOf] = useState(today())
+  const [saving, setSaving] = useState(null) // `${moduleId}|${date}` while in flight
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    // `/tracker` (no :id) renders this with id undefined — don't query jobs with
-    // id=eq.undefined (that 400s). Only fetch when a job id is present.
     if (!id) {
       setLoading(false)
       return
@@ -33,62 +54,134 @@ export default function JobTracker() {
 
   async function fetchData() {
     setLoading(true)
-    // Same defensive pattern as JobDetail: fetch the bare job first so a
-    // broken legacy relation can't 404 the whole page.
     const [settingsRes, jobRes] = await Promise.all([
       supabase.from('company_settings').select('*').single(),
       supabase.from('jobs').select('*').eq('id', id).single(),
     ])
-    if (settingsRes.data) setLaborRate(parseFloat(settingsRes.data.labor_rate_per_man_day) || 400)
+    setSettings(settingsRes.data || null)
     if (!jobRes.data) {
       setLoading(false)
       return
     }
+    setJob(jobRes.data)
 
-    const [projectsRes, cosRes] = await Promise.all([
-      supabase
-        .from('projects')
-        .select('*, modules ( *, actual_entries ( * ) )')
-        .eq('job_id', jobRes.data.id),
-      supabase.from('change_orders').select('*').eq('job_id', jobRes.data.id),
+    // The estimate is the baseline every figure measures against, so a job with
+    // no estimate has nothing to track rather than a zeroed-out tracker.
+    const modsPromise = jobRes.data.estimate_id
+      ? supabase
+          .from('estimate_projects')
+          .select('id, project_name, estimate_modules ( * )')
+          .eq('estimate_id', jobRes.data.estimate_id)
+      : Promise.resolve({ data: [] })
+
+    const [projRes, compRes, timeRes, crewRes, schedRes, woRes] = await Promise.all([
+      modsPromise,
+      supabase.from('module_completion').select('*').eq('job_id', id),
+      supabase.from('time_entries').select('*').eq('job_id', id),
+      supabase.from('crews').select('*'),
+      supabase.from('schedule_items').select('*').eq('job_id', id),
+      supabase.from('work_orders').select('id, estimate_module_id').eq('job_id', id),
     ])
-    setJob({
-      ...jobRes.data,
-      projects: projectsRes.data || [],
-      change_orders: cosRes.data || [],
-    })
+
+    const flat = []
+    for (const p of projRes.data || []) {
+      for (const m of p.estimate_modules || []) flat.push({ ...m, project_name: p.project_name })
+    }
+    setModules(flat)
+    setCompletions(compRes.data || [])
+    setTimeEntries(timeRes.data || [])
+    setCrews(crewRes.data || [])
+    setScheduleItems(schedRes.data || [])
+    setWorkOrders(woRes.data || [])
     setLoading(false)
   }
 
-  async function saveLogEntry(e) {
-    e.preventDefault()
-    if (!logTarget) return
-    setSavingLog(true)
-    const { error } = await supabase.from('actual_entries').insert({
-      module_id: logTarget.id,
-      entry_date: logForm.entry_date || new Date().toISOString().split('T')[0],
-      actual_man_days: parseFloat(logForm.actual_man_days) || 0,
-      actual_material_cost: parseFloat(logForm.actual_material_cost) || 0,
-      notes: logForm.notes.trim(),
-      created_by: user?.id,
-    })
-    setSavingLog(false)
-    if (!error) {
-      setLogTarget(null)
-      setLogForm({
-        actual_man_days: '',
-        actual_material_cost: '',
-        entry_date: new Date().toISOString().split('T')[0],
-        notes: '',
-      })
-      fetchData()
-    }
+  const rates = useMemo(() => resolveRates(settings), [settings])
+
+  const attribution = useMemo(
+    () => attributeHoursByModule({ timeEntries, scheduleItems, workOrders, crews }),
+    [timeEntries, scheduleItems, workOrders, crews]
+  )
+
+  const snap = useMemo(
+    () =>
+      rates ? jobProfitAsOf({ modules, completions, timeEntries, rates, attribution }) : null,
+    [modules, completions, timeEntries, rates, attribution]
+  )
+
+  const week = useMemo(() => weekDates(weekOf), [weekOf])
+
+  // Produced-per-day across the displayed week. Each day is the difference
+  // between two running totals, so a restated percentage recomputes the series
+  // rather than contradicting it.
+  const series = useMemo(
+    () => (rates ? dailySeries({ modules, completions, timeEntries, rates, dates: week }) : []),
+    [modules, completions, timeEntries, rates, week]
+  )
+
+  // Latest reading per module per date, for pre-filling the grid.
+  const cellValue = (moduleId, date) => {
+    const row = completions.find(c => c.estimate_module_id === moduleId && c.entry_date === date)
+    return row ? String(row.completion_pct) : ''
   }
 
-  async function deleteEntry(entryId) {
-    if (!confirm('Delete this entry?')) return
-    await supabase.from('actual_entries').delete().eq('id', entryId)
-    fetchData()
+  async function saveCompletion(moduleId, date, raw) {
+    const trimmed = String(raw ?? '').trim()
+    const key = `${moduleId}|${date}`
+    setError('')
+
+    // Clearing a cell removes the reading rather than storing a zero — 0% and
+    // "not assessed that day" are different states.
+    if (trimmed === '') {
+      const existing = completions.find(
+        c => c.estimate_module_id === moduleId && c.entry_date === date
+      )
+      if (!existing) return
+      setSaving(key)
+      const { error: delErr } = await supabase
+        .from('module_completion')
+        .delete()
+        .eq('id', existing.id)
+      setSaving(null)
+      if (delErr) return setError(delErr.message)
+      setCompletions(prev => prev.filter(c => c.id !== existing.id))
+      return
+    }
+
+    const value = parseFloat(trimmed)
+    if (!Number.isFinite(value) || value < 0 || value > 100) {
+      setError('Completion must be between 0 and 100.')
+      return
+    }
+
+    setSaving(key)
+    const { data, error: upErr } = await supabase
+      .from('module_completion')
+      .upsert(
+        {
+          job_id: id,
+          estimate_module_id: moduleId,
+          entry_date: date,
+          completion_pct: value,
+          created_by: user?.id,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'estimate_module_id,entry_date' }
+      )
+      .select()
+      .single()
+    setSaving(null)
+    if (upErr) return setError(upErr.message)
+    setCompletions(prev => [
+      ...prev.filter(c => !(c.estimate_module_id === moduleId && c.entry_date === date)),
+      data,
+    ])
+  }
+
+  function shiftWeek(days) {
+    const d = new Date(`${weekOf}T00:00:00`)
+    d.setDate(d.getDate() + days)
+    setWeekOf(d.toISOString().slice(0, 10))
   }
 
   if (loading)
@@ -99,64 +192,18 @@ export default function JobTracker() {
     )
   if (!job) return <div className="card text-center py-12 text-gray-500">Job not found.</div>
 
-  // ---- Calculations ----
-  let estManDays = 0,
-    estMaterials = 0
-  let actualManDays = 0,
-    actualMaterials = 0
-
-  for (const p of job.projects || []) {
-    for (const m of p.modules || []) {
-      estManDays += parseFloat(m.estimated_man_days || 0)
-      estMaterials += parseFloat(m.estimated_material_cost || 0)
-      for (const e of m.actual_entries || []) {
-        actualManDays += parseFloat(e.actual_man_days || 0)
-        actualMaterials += parseFloat(e.actual_material_cost || 0)
-      }
-    }
-  }
-
-  const coRevenue = (job.change_orders || []).reduce(
-    (s, co) => s + parseFloat(co.additional_contract_price || 0),
-    0
-  )
-  const coManDays = (job.change_orders || []).reduce(
-    (s, co) => s + parseFloat(co.additional_man_days || 0),
-    0
-  )
-  const coMaterials = (job.change_orders || []).reduce(
-    (s, co) => s + parseFloat(co.additional_material_cost || 0),
-    0
-  )
-
-  const totalRevenue = parseFloat(job.contract_price || 0) + coRevenue
-  const totalEstMD = estManDays + coManDays
-  const totalEstMat = estMaterials + coMaterials
-  const totalEstLaborCost = totalEstMD * laborRate
-  const totalEstCost = totalEstLaborCost + totalEstMat
-  const estGP = totalRevenue - totalEstCost
-  const estGPPct = totalRevenue > 0 ? (estGP / totalRevenue) * 100 : 0
-
-  const totalActualLaborCost = actualManDays * laborRate
-  const totalActualCost = totalActualLaborCost + actualMaterials
-  const actualGP = totalRevenue - totalActualCost
-  const actualGPPct = totalRevenue > 0 ? (actualGP / totalRevenue) * 100 : 0
-
-  const overallPct = totalEstCost > 0 ? Math.min(100, (totalActualCost / totalEstCost) * 100) : 0
-  const gpTrend = actualGP > estGP ? '📈' : actualGP < estGP ? '📉' : '➡️'
+  const glpmde = snap && snap.glpeTotal > 0 && totalEmd(modules) > 0
+    ? snap.glpeTotal / totalEmd(modules)
+    : null
 
   return (
-    <div className="max-w-3xl mx-auto">
-      {/* Breadcrumb */}
+    <div className="max-w-6xl mx-auto">
       <div className="flex items-center gap-2 mb-4 text-sm">
         <Link to="/" className="text-gray-400 hover:text-gray-600">
           Jobs
         </Link>
         <span className="text-gray-300">/</span>
-        <Link
-          to={`/jobs/${id}`}
-          className="text-gray-400 hover:text-gray-600 truncate max-w-[120px]"
-        >
+        <Link to={`/jobs/${id}`} className="text-gray-400 hover:text-gray-600 truncate max-w-[160px]">
           {job.client_name}
         </Link>
         <span className="text-gray-300">/</span>
@@ -165,329 +212,237 @@ export default function JobTracker() {
 
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Job Tracker</h1>
       <p className="text-gray-500 text-sm mb-5">
-        {job.client_name} — {job.job_address}
+        {job.client_name}
+        {job.job_address ? ` — ${job.job_address}` : ''}
       </p>
 
-      {/* Overall progress bar */}
+      {/* No-fallback rule: an unset rate stops the calculation and says so,
+          rather than resolving to a constant and reporting invented profit. */}
+      {!rates && (
+        <div className="card mb-5 border-amber-300 bg-amber-50">
+          <p className="font-semibold text-amber-900 mb-1">Labour rates are not set</p>
+          <p className="text-sm text-amber-800">
+            Gross profit cannot be calculated until{' '}
+            <strong>Average Hourly Crew Rate</strong> and <strong>Overtime Multiplier</strong> are
+            set in Company Settings. No default is assumed — a guessed rate would report profit
+            this job cannot support.
+          </p>
+        </div>
+      )}
+
+      {!job.estimate_id && (
+        <div className="card mb-5 border-amber-300 bg-amber-50">
+          <p className="text-sm text-amber-800">
+            This job has no linked estimate, so there is no baseline to measure against.
+          </p>
+        </div>
+      )}
+
+      {error && (
+        <div className="card mb-4 border-red-300 bg-red-50">
+          <p className="text-sm text-red-700">{error}</p>
+        </div>
+      )}
+
+      {snap && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
+            <Stat label="Gross Profit Produced" value={fmt(snap.totalGpProduced)} tone="green" big />
+            <Stat label="Labour GP (GLPA)" value={fmt(snap.glpa)} sub={`of ${fmt(snap.glpeTotal)} est.`} />
+            <Stat label="Sub GP" value={fmt(snap.subEarned)} sub={`of ${fmt(snap.subTotal)} est.`} />
+            <Stat
+              label="GLPMDA"
+              value={snap.glpmda == null ? '—' : fmt2(snap.glpmda)}
+              sub={glpmde ? `vs ${fmt(glpmde)} est.` : null}
+              tone={snap.glpmda != null && glpmde && snap.glpmda < glpmde ? 'red' : 'green'}
+            />
+            <Stat label="Complete" value={pct(snap.jobCompletion)} sub={`${snap.actualManDays.toFixed(2)} MD used`} />
+          </div>
+
+          <div className="card mb-5">
+            <p className="font-semibold text-gray-800 mb-2">Labour cost against budget</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <Line label="Hours (std / OT)" value={`${snap.hours.standard.toFixed(1)} / ${snap.hours.overtime.toFixed(1)}`} />
+              <Line label="Running labour cost" value={fmt(snap.rlc)} />
+              <Line label="Budget at this completion" value={fmt(snap.elcToDate)} />
+              <Line
+                label="Variance"
+                value={`${snap.costVariance > 0 ? '+' : ''}${fmt(snap.costVariance)}`}
+                tone={snap.costVariance > 0 ? 'red' : 'green'}
+              />
+            </div>
+            {snap.laborDataMissing && (
+              <p className="text-xs text-amber-700 mt-3">
+                <strong>No hours clocked against this job.</strong> Completion has been entered, so
+                earned profit is shown — but the cost side is unknown, and no favourable variance
+                is being booked for the unspent budget.
+              </p>
+            )}
+            {!snap.laborDataMissing && snap.laborCoverage > 0 && snap.laborCoverage < 0.6 && (
+              <p className="text-xs text-amber-700 mt-3">
+                Only {Math.round(snap.laborCoverage * 100)}% of the labour this completion implies
+                has been clocked. The variance below reads favourable mostly because hours are
+                missing, not because the job is running cheap.
+              </p>
+            )}
+            {attribution.coverage.ratio < 1 && (
+              <p className="text-xs text-gray-500 mt-3">
+                {Math.round(attribution.coverage.ratio * 100)}% of hours resolve to a specific
+                module through the work order. The rest are counted at job level only — module
+                columns show earned profit without a cost variance.
+              </p>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── Weekly completion entry ─────────────────────────────────────────── */}
       <div className="card mb-5">
-        <div className="flex items-center justify-between mb-2">
-          <p className="font-semibold text-gray-800">Overall Cost Progress</p>
-          <span
-            className={`text-sm font-bold ${overallPct > 100 ? 'text-red-600' : 'text-gray-700'}`}
-          >
-            {overallPct.toFixed(0)}%
-          </span>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="font-semibold text-gray-800">Completion by day</p>
+            <p className="text-xs text-gray-500">
+              Cumulative percent complete per module. Entering 20% after 10% means 10% was produced
+              that day.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="button" className="btn-secondary text-sm px-3 py-1" onClick={() => shiftWeek(-7)}>
+              ‹ Prev
+            </button>
+            <span className="text-sm text-gray-600 tabular-nums">{week[0]} – {week[6]}</span>
+            <button type="button" className="btn-secondary text-sm px-3 py-1" onClick={() => shiftWeek(7)}>
+              Next ›
+            </button>
+          </div>
         </div>
-        <div className="w-full bg-gray-100 rounded-full h-3 mb-1">
-          <div
-            className={`h-3 rounded-full transition-all ${overallPct > 100 ? 'bg-red-500' : overallPct > 80 ? 'bg-yellow-500' : 'bg-green-500'}`}
-            style={{ width: `${Math.min(overallPct, 100)}%` }}
-          ></div>
-        </div>
-        <p className="text-xs text-gray-500">Actual cost vs. estimated cost budget</p>
-      </div>
 
-      {/* GP Summary Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <GPSummaryCard
-          label="Total Revenue"
-          value={`$${totalRevenue.toLocaleString()}`}
-          color="blue"
-        />
-        <GPSummaryCard
-          label="Est. Gross Profit"
-          value={`$${estGP.toLocaleString()}`}
-          sub={`${estGPPct.toFixed(1)}% margin`}
-          color={estGPPct >= 25 ? 'green' : estGPPct >= 10 ? 'yellow' : 'red'}
-        />
-        <GPSummaryCard
-          label={`Running GP ${gpTrend}`}
-          value={`$${actualGP.toLocaleString()}`}
-          sub={`${actualGPPct.toFixed(1)}% margin`}
-          color={actualGPPct >= 25 ? 'green' : actualGPPct >= 10 ? 'yellow' : 'red'}
-          large
-        />
-        <GPSummaryCard
-          label="GP Variance"
-          value={`${actualGP - estGP >= 0 ? '+' : ''}$${(actualGP - estGP).toLocaleString()}`}
-          sub="vs. estimate"
-          color={actualGP >= estGP ? 'green' : 'red'}
-        />
-      </div>
-
-      {/* Detailed breakdown */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
-        <div className="card">
-          <h3 className="font-semibold text-gray-800 mb-3">Estimated Budget</h3>
-          <table className="w-full text-sm">
-            <tbody className="divide-y divide-gray-100">
-              <tr>
-                <td className="py-1.5 text-gray-500">Contract Price</td>
-                <td className="text-right font-medium">
-                  ${parseFloat(job.contract_price || 0).toLocaleString()}
-                </td>
-              </tr>
-              {coRevenue > 0 && (
-                <tr>
-                  <td className="py-1.5 text-gray-500">Change Orders</td>
-                  <td className="text-right font-medium text-blue-600">
-                    +${coRevenue.toLocaleString()}
-                  </td>
+        {modules.length === 0 ? (
+          <p className="text-sm text-gray-500 py-4 text-center">
+            No estimate modules on this job.
+          </p>
+        ) : (
+          <div className="overflow-x-auto thin-scroll">
+            <table className="w-full text-sm min-w-[720px]">
+              <thead>
+                <tr className="text-left text-xs text-gray-500 border-b border-gray-200">
+                  <th className="py-2 pr-3 font-medium">Module</th>
+                  {week.map((d, i) => (
+                    <th key={d} className="py-2 px-1 text-center font-medium">
+                      {DAY_NAMES[i]}
+                      <span className="block text-[10px] text-gray-400">{d.slice(5)}</span>
+                    </th>
+                  ))}
+                  <th className="py-2 pl-3 text-right font-medium">Earned</th>
                 </tr>
-              )}
-              <tr>
-                <td className="py-1.5 text-gray-500">Total Revenue</td>
-                <td className="text-right font-bold">${totalRevenue.toLocaleString()}</td>
-              </tr>
-              <tr>
-                <td className="py-1.5 text-gray-500">
-                  Est. Labor ({totalEstMD.toFixed(1)} MD × ${laborRate})
-                </td>
-                <td className="text-right text-red-600">-${totalEstLaborCost.toLocaleString()}</td>
-              </tr>
-              <tr>
-                <td className="py-1.5 text-gray-500">Est. Materials</td>
-                <td className="text-right text-red-600">-${totalEstMat.toLocaleString()}</td>
-              </tr>
-              <tr className="border-t-2 border-gray-200">
-                <td className="py-2 font-semibold">Est. Gross Profit</td>
-                <td
-                  className={`text-right font-bold text-lg ${estGP >= 0 ? 'text-green-700' : 'text-red-600'}`}
-                >
-                  ${estGP.toLocaleString()}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {(snap?.rows || modules.map(m => ({ id: m.id, name: m.module_name || m.module_type }))).map(row => (
+                  <tr key={row.id} className="border-b border-gray-100 last:border-0">
+                    <td className="py-2 pr-3">
+                      <span className="font-medium text-gray-800">{row.name}</span>
+                      {row.emd != null && (
+                        <span className="block text-[11px] text-gray-400">
+                          {row.emd} MD · {fmt(row.glpe)} est.
+                        </span>
+                      )}
+                    </td>
+                    {week.map(d => {
+                      const key = `${row.id}|${d}`
+                      return (
+                        <td key={d} className="py-1 px-1 text-center">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            defaultValue={cellValue(row.id, d)}
+                            onBlur={e => saveCompletion(row.id, d, e.target.value)}
+                            disabled={saving === key}
+                            className="w-14 text-center border border-gray-300 rounded px-1 py-1 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                            placeholder="—"
+                          />
+                        </td>
+                      )
+                    })}
+                    <td className="py-2 pl-3 text-right tabular-nums font-semibold text-green-700">
+                      {row.earnedLaborGp != null ? fmt(row.earnedLaborGp + (row.earnedSubGp || 0)) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Produced per day ────────────────────────────────────────────────── */}
+      {series.length > 0 && (
         <div className="card">
-          <h3 className="font-semibold text-gray-800 mb-3">Actual to Date</h3>
-          <table className="w-full text-sm">
-            <tbody className="divide-y divide-gray-100">
-              <tr>
-                <td className="py-1.5 text-gray-500">Total Revenue</td>
-                <td className="text-right font-medium">${totalRevenue.toLocaleString()}</td>
-              </tr>
-              <tr>
-                <td className="py-1.5 text-gray-500">
-                  Actual Labor ({actualManDays.toFixed(1)} MD × ${laborRate})
-                </td>
-                <td className="text-right text-red-600">
-                  -${totalActualLaborCost.toLocaleString()}
-                </td>
-              </tr>
-              <tr>
-                <td className="py-1.5 text-gray-500">Actual Materials</td>
-                <td className="text-right text-red-600">-${actualMaterials.toLocaleString()}</td>
-              </tr>
-              <tr className="border-t-2 border-gray-200">
-                <td className="py-2 font-semibold">Running GP</td>
-                <td
-                  className={`text-right font-bold text-lg ${actualGP >= 0 ? 'text-green-700' : 'text-red-600'}`}
-                >
-                  ${actualGP.toLocaleString()}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Change Orders summary */}
-      {(job.change_orders || []).length > 0 && (
-        <div className="card mb-5">
-          <h3 className="font-semibold text-gray-800 mb-2">Change Orders</h3>
-          <div className="space-y-2">
-            {job.change_orders.map(co => (
-              <div
-                key={co.id}
-                className="flex items-center justify-between text-sm p-2 bg-blue-50 rounded-lg"
-              >
-                <span className="text-gray-700">{co.description}</span>
-                <span className="text-blue-700 font-medium ml-2">
-                  +${parseFloat(co.additional_contract_price || 0).toLocaleString()}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Log Entry Modal */}
-      {logTarget && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md">
-            <div className="p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="font-bold text-gray-900">Log Entry</h3>
-                  <p className="text-sm text-gray-500">{logTarget.module_name}</p>
-                </div>
-                <button
-                  onClick={() => setLogTarget(null)}
-                  className="text-gray-400 hover:text-gray-600 text-xl"
-                >
-                  ×
-                </button>
-              </div>
-              <form onSubmit={saveLogEntry} className="space-y-3">
-                <div>
-                  <label className="label">Date</label>
-                  <input
-                    className="input"
-                    type="date"
-                    value={logForm.entry_date}
-                    onChange={e => setLogForm(p => ({ ...p, entry_date: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label className="label">Man Days Worked (1 MD = 8 hrs)</label>
-                  <input
-                    className="input"
-                    type="number"
-                    step="0.25"
-                    min="0"
-                    value={logForm.actual_man_days}
-                    onChange={e => setLogForm(p => ({ ...p, actual_man_days: e.target.value }))}
-                    placeholder="e.g. 2.5"
-                  />
-                  {logForm.actual_man_days && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      = {(parseFloat(logForm.actual_man_days) * 8).toFixed(1)} hours | Cost: $
-                      {(parseFloat(logForm.actual_man_days) * laborRate).toLocaleString()}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="label">Material Cost ($)</label>
-                  <input
-                    className="input"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={logForm.actual_material_cost}
-                    onChange={e =>
-                      setLogForm(p => ({ ...p, actual_material_cost: e.target.value }))
-                    }
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="label">Notes (optional)</label>
-                  <textarea
-                    className="input resize-none"
-                    rows={2}
-                    value={logForm.notes}
-                    onChange={e => setLogForm(p => ({ ...p, notes: e.target.value }))}
-                    placeholder="What was done today..."
-                  />
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setLogTarget(null)}
-                    className="btn-secondary flex-1"
-                  >
-                    Cancel
-                  </button>
-                  <button type="submit" disabled={savingLog} className="btn-primary flex-1">
-                    {savingLog ? 'Saving...' : 'Save Entry'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Per-project module tracker */}
-      <div>
-        <h2 className="font-semibold text-gray-900 text-lg mb-3">Module Breakdown</h2>
-        {(job.projects || []).map(project => (
-          <div key={project.id} className="mb-5">
-            <div className="flex items-center gap-2 mb-2">
-              <h3 className="font-semibold text-green-800">{project.project_name}</h3>
-              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                {project.project_type}
-              </span>
-            </div>
-            {(project.modules || []).map(mod => (
-              <div key={mod.id}>
-                <ModuleTrackerRow
-                  module={mod}
-                  laborRate={laborRate}
-                  onLogEntry={m => {
-                    setLogTarget(m)
-                    setLogForm({
-                      actual_man_days: '',
-                      actual_material_cost: '',
-                      entry_date: new Date().toISOString().split('T')[0],
-                      notes: '',
-                    })
-                  }}
-                />
-
-                {/* Entry history toggle */}
-                {(mod.actual_entries || []).length > 0 && (
-                  <div className="mb-3 -mt-2">
-                    <button
-                      onClick={() => setShowHistory(prev => ({ ...prev, [mod.id]: !prev[mod.id] }))}
-                      className="text-xs text-green-700 font-medium hover:underline px-4"
+          <p className="font-semibold text-gray-800 mb-1">Gross profit produced this week</p>
+          <p className="text-xs text-gray-500 mb-3">
+            Each day is the change in the running total. A negative day means hours were burned
+            without completion moving — cost with no earned profit.
+          </p>
+          <div className="overflow-x-auto thin-scroll">
+            <table className="w-full text-sm min-w-[560px]">
+              <thead>
+                <tr className="text-left text-xs text-gray-500 border-b border-gray-200">
+                  <th className="py-2 pr-3 font-medium">Day</th>
+                  <th className="py-2 px-3 text-right font-medium">Labour</th>
+                  <th className="py-2 px-3 text-right font-medium">Sub</th>
+                  <th className="py-2 px-3 text-right font-medium">Produced</th>
+                  <th className="py-2 pl-3 text-right font-medium">Running total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {series.map((d, i) => (
+                  <tr key={d.date} className="border-b border-gray-100 last:border-0">
+                    <td className="py-2 pr-3 text-gray-700">
+                      {DAY_NAMES[i]} <span className="text-gray-400 text-xs">{d.date.slice(5)}</span>
+                    </td>
+                    <td className="py-2 px-3 text-right tabular-nums">{fmt(d.laborProducedToday)}</td>
+                    <td className="py-2 px-3 text-right tabular-nums">{fmt(d.subProducedToday)}</td>
+                    <td
+                      className={`py-2 px-3 text-right tabular-nums font-semibold ${
+                        d.producedToday < 0 ? 'text-red-600' : 'text-green-700'
+                      }`}
                     >
-                      {showHistory[mod.id] ? '▲ Hide' : '▼ Show'} {mod.actual_entries.length} entr
-                      {mod.actual_entries.length === 1 ? 'y' : 'ies'}
-                    </button>
-
-                    {showHistory[mod.id] && (
-                      <div className="mt-2 mx-1 border border-gray-100 rounded-lg overflow-hidden">
-                        <table className="w-full text-xs">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="text-left py-2 px-3 text-gray-500">Date</th>
-                              <th className="text-right py-2 px-3 text-gray-500">Man Days</th>
-                              <th className="text-right py-2 px-3 text-gray-500">Materials</th>
-                              <th className="text-right py-2 px-3 text-gray-500">Notes</th>
-                              <th className="py-2 px-3"></th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                            {mod.actual_entries
-                              .sort((a, b) => new Date(b.entry_date) - new Date(a.entry_date))
-                              .map(entry => (
-                                <tr key={entry.id} className="bg-white hover:bg-gray-50">
-                                  <td className="py-2 px-3 text-gray-700">
-                                    {new Date(entry.entry_date).toLocaleDateString()}
-                                  </td>
-                                  <td className="py-2 px-3 text-right text-gray-700">
-                                    {parseFloat(entry.actual_man_days || 0).toFixed(2)}
-                                  </td>
-                                  <td className="py-2 px-3 text-right text-gray-700">
-                                    ${parseFloat(entry.actual_material_cost || 0).toLocaleString()}
-                                  </td>
-                                  <td className="py-2 px-3 text-right text-gray-400 max-w-[100px] truncate">
-                                    {entry.notes || '-'}
-                                  </td>
-                                  <td className="py-2 px-3">
-                                    <button
-                                      onClick={() => deleteEntry(entry.id)}
-                                      className="text-red-400 hover:text-red-600"
-                                    >
-                                      ✕
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+                      {fmt(d.producedToday)}
+                    </td>
+                    <td className="py-2 pl-3 text-right tabular-nums text-gray-600">{fmt(d.totalGp)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function totalEmd(modules) {
+  return (modules || []).reduce((s, m) => s + (parseFloat(m.man_days) || 0), 0)
+}
+
+function Stat({ label, value, sub, tone, big }) {
+  const color =
+    tone === 'green' ? 'text-green-700' : tone === 'red' ? 'text-red-600' : 'text-gray-900'
+  return (
+    <div className="card">
+      <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">{label}</p>
+      <p className={`font-bold tabular-nums ${big ? 'text-xl' : 'text-lg'} ${color}`}>{value}</p>
+      {sub && <p className="text-[11px] text-gray-400 mt-0.5">{sub}</p>}
+    </div>
+  )
+}
+
+function Line({ label, value, tone }) {
+  const color = tone === 'green' ? 'text-green-700' : tone === 'red' ? 'text-red-600' : 'text-gray-800'
+  return (
+    <div>
+      <p className="text-[11px] text-gray-500">{label}</p>
+      <p className={`font-semibold tabular-nums ${color}`}>{value}</p>
     </div>
   )
 }

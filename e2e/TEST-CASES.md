@@ -477,3 +477,28 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - "TOTAL PRICE" reverted to sentence case and shortened to **"Price"**.
 - Spec note: the boxed value carries `text-green-200` inside a green border, NOT the old
   `text-green-400` plain-cell class — the green-profit test asserts the new class.
+
+## Job profit tracking — the PM completion grid and produced GP
+
+- `module_completion` (job, module, date, cumulative %) added to staging, with the standard
+  `tenant_isolation` policy + `set_tenant_id()` trigger and a unique index on
+  (module, date) so a correction updates the reading rather than adding a second.
+  `company_settings.overtime_multiplier` added (default 1.5).
+- `src/lib/jobProfit.js` holds all the arithmetic as pure functions so the cross-job PM grid
+  can reuse it. 28 unit tests in `jobProfit.test.mjs`, including the design doc's six-module
+  table reproduced verbatim — if those numbers move, the formula changed and the doc is stale.
+- `JobTracker` rebuilt. It previously read the legacy projects → modules → actual_entries
+  tables (0 modules, 0 entries in production) and rendered an empty shell; it now reads the
+  real estimate model via `jobs.estimate_id` and is where the PM enters percent complete.
+- GUARD FOUND BY A FAILING TEST: with completion entered and NO hours clocked, the raw
+  formula books the entire unspent budget as a favourable variance — a job nobody clocked
+  into looks like the most profitable on the board. `laborDataMissing` now suppresses the
+  variance and the page says why. `laborCoverage` flags the weaker partial-data version of
+  the same hazard below 60%.
+- NO-FALLBACK: `resolveRates` returns null unless BOTH `avg_hourly_crew_rate` and
+  `overtime_multiplier` are set; the page shows a fix-it banner instead of a number.
+- Module-level cost variance uses the work-order chain (time entry → employee → crew →
+  schedule item → work_order_ids → module). Hours it cannot resolve are reported as
+  unattributed, never apportioned silently; a crew on several modules in one day splits
+  evenly and the row is flagged `apportioned`.
+- Removed `GPSummaryCard.jsx` and `ModuleTrackerRow.jsx`, orphaned by the rebuild.
