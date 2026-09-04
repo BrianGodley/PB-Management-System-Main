@@ -96,8 +96,13 @@ function Pair({
         ? 'text-red-400'
         : 'text-green-400'
   return (
-    <div className="flex-1 min-w-0 px-3 xl:px-8 2xl:px-14 py-1.5">
-      <div className="flex items-start justify-between gap-3 xl:gap-5 2xl:gap-6 min-w-0">
+    <div className="flex-1 min-w-0 px-2 py-1.5">
+      {/* The pair sits CENTRED with a tight gap, so Estimated and Actual read as
+          one unit. justify-between pushed them to opposite edges, which put
+          "Actual Man Days" nearer "Estimated Labor Cost" than its own partner —
+          the cell padding is what should separate pairs, not the space inside
+          them. */}
+      <div className="flex items-start justify-center gap-4 xl:gap-6 min-w-0">
         {/* Each half centres on itself, so the figure sits under the middle of
             its own label rather than flush to the group's outer edges. */}
         <div className="min-w-0 text-center">

@@ -681,3 +681,12 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   narrower window rather than the words. Verified 0 of 12 truncated at 1440px and above.
 - Each half of a pair centres on itself, so the figure sits under the middle of its own
   label instead of flush against the group's outer border.
+
+## Summary bar — pairs read as units
+
+- `justify-between` pushed Estimated and Actual to opposite edges of their cell, so "Actual
+  Man Days" sat nearer "Estimated Labor Cost" than its own partner — the proximity grouped
+  the wrong things. Pairs now sit CENTRED with a tight internal gap; the cell padding is what
+  separates one pair from the next.
+- Measured: 24px within a pair against 132–176px between pairs, so the visual grouping now
+  matches the logical one.
