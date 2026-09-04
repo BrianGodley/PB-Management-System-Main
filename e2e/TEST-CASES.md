@@ -690,3 +690,14 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   separates one pair from the next.
 - Measured: 24px within a pair against 132–176px between pairs, so the visual grouping now
   matches the logical one.
+
+## Summary bar — In House Labor as four cards
+
+- The single long bar became four separate tiles, one per estimated/actual pair: Man Days,
+  Labor Cost, GP, GLPMD. `Group` gained a `cards` mode and a `Card` tile component. The tile
+  edge does the grouping that spacing alone kept fighting — with one bar, whatever gap made
+  a pair cohere also pushed it against its neighbour.
+- Inside a tile the pair spreads with `px-9` and `justify-between`: ~74–140px between
+  estimated and actual, against a hard card boundary either side. Edge-to-edge (px-4) read
+  as two unrelated figures again; centred (px-2) wasted the tile.
+- Verified 0 of 12 labels truncated at 1600px, no page errors.

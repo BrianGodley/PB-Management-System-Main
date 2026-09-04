@@ -96,13 +96,11 @@ function Pair({
         ? 'text-red-400'
         : 'text-green-400'
   return (
-    <div className="flex-1 min-w-0 px-2 py-1.5">
-      {/* The pair sits CENTRED with a tight gap, so Estimated and Actual read as
-          one unit. justify-between pushed them to opposite edges, which put
-          "Actual Man Days" nearer "Estimated Labor Cost" than its own partner —
-          the cell padding is what should separate pairs, not the space inside
-          them. */}
-      <div className="flex items-start justify-center gap-4 xl:gap-6 min-w-0">
+    <div className="flex-1 min-w-0 px-9 py-1.5">
+      {/* The card border does the grouping now, so the pair can sit wider than
+          it did in the old single bar — but not edge to edge, which read as two
+          separate figures again. */}
+      <div className="flex items-start justify-between gap-3 min-w-0">
         {/* Each half centres on itself, so the figure sits under the middle of
             its own label rather than flush to the group's outer edges. */}
         <div className="min-w-0 text-center">
@@ -142,7 +140,11 @@ function Single({ label, value, currency = false, unknown = false, unknownNote, 
   )
 }
 
-function Group({ title, accent, grow, children }) {
+// `cards` splits the group into separate tiles instead of columns divided
+// inside one long bar. Four estimated/actual pairs read better as four objects
+// than as eight figures behind hairlines — the card edge does the grouping that
+// spacing alone was struggling to do.
+function Group({ title, accent, grow, children, cards = false }) {
   return (
     <div className={`min-w-0 flex flex-col ${grow}`}>
       <p
@@ -150,11 +152,26 @@ function Group({ title, accent, grow, children }) {
       >
         {title}
       </p>
-      <div
-        className={`flex-1 flex items-stretch divide-x divide-white/10 rounded-lg border bg-gray-900 py-1 px-1 ${accent.border}`}
-      >
-        {children}
-      </div>
+      {cards ? (
+        <div className="flex-1 flex flex-col sm:flex-row gap-2 items-stretch">{children}</div>
+      ) : (
+        <div
+          className={`flex-1 flex items-stretch divide-x divide-white/10 rounded-lg border bg-gray-900 py-1 px-1 ${accent.border}`}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// One tile inside a card-mode group.
+function Card({ accent, children }) {
+  return (
+    <div
+      className={`flex-1 min-w-0 flex items-center justify-center rounded-lg border bg-gray-900 py-2 ${accent}`}
+    >
+      {children}
     </div>
   )
 }
@@ -1062,50 +1079,59 @@ export default function JobComparison({ job }) {
               <Group
                 title="In House Labor"
                 grow="w-full"
+                cards
                 accent={{ text: 'text-blue-700', border: 'border-blue-400/70' }}
               >
-                <Pair
-                  estLabel="Estimated Man Days"
-                  actLabel="Actual Man Days"
-                  est={c.estManDays}
-                  act={profit ? profit.actualManDays : c.actManDays}
-                  inverse
-                  expected={profit ? c.estManDays * profit.jobCompletion : null}
-                />
-                <Pair
-                  estLabel="Estimated Labor Cost"
-                  actLabel="Actual Labor Cost"
-                  est={c.estLaborCost}
-                  act={profit ? profit.rlc : c.actLaborCost}
-                  currency
-                  inverse
-                  unknown={!profit}
-                  unknownNote="Set the crew rate and overtime multiplier in HR → Labor Rates."
-                  expected={profit ? profit.elcToDate : null}
-                />
-                <Pair
-                  estLabel="Estimated GP"
-                  actLabel="Actual GP"
-                  est={profit ? profit.glpeTotal : 0}
-                  act={profit ? profit.glpa : 0}
-                  currency
-                  unknown={!profit}
-                  unknownNote="Set the crew rate and overtime multiplier in HR → Labor Rates."
-                  expected={profit ? profit.earned : null}
-                />
+                <Card accent="border-blue-400/70">
+                  <Pair
+                    estLabel="Estimated Man Days"
+                    actLabel="Actual Man Days"
+                    est={c.estManDays}
+                    act={profit ? profit.actualManDays : c.actManDays}
+                    inverse
+                    expected={profit ? c.estManDays * profit.jobCompletion : null}
+                  />
+                </Card>
+                <Card accent="border-blue-400/70">
+                  <Pair
+                    estLabel="Estimated Labor Cost"
+                    actLabel="Actual Labor Cost"
+                    est={c.estLaborCost}
+                    act={profit ? profit.rlc : c.actLaborCost}
+                    currency
+                    inverse
+                    unknown={!profit}
+                    unknownNote="Set the crew rate and overtime multiplier in HR → Labor Rates."
+                    expected={profit ? profit.elcToDate : null}
+                  />
+                </Card>
+                <Card accent="border-blue-400/70">
+                  <Pair
+                    estLabel="Estimated GP"
+                    actLabel="Actual GP"
+                    est={profit ? profit.glpeTotal : 0}
+                    act={profit ? profit.glpa : 0}
+                    currency
+                    unknown={!profit}
+                    unknownNote="Set the crew rate and overtime multiplier in HR → Labor Rates."
+                    expected={profit ? profit.earned : null}
+                  />
+                </Card>
                 {/* The rate the job is producing at, against the rate it was
                     sold at — the one figure comparable across jobs of any size.
                     Higher is better here, so no `inverse`. */}
-                <Pair
-                  estLabel="Estimated GLPMD"
-                  actLabel="Actual GLPMD"
-                  est={glpmde || 0}
-                  act={profit?.glpmda || 0}
-                  currency
-                  unknown={!profit || profit.glpmda == null}
-                  unknownNote="No hours clocked yet, so there is no produced rate to show."
-                  expected={glpmde}
-                />
+                <Card accent="border-blue-400/70">
+                  <Pair
+                    estLabel="Estimated GLPMD"
+                    actLabel="Actual GLPMD"
+                    est={glpmde || 0}
+                    act={profit?.glpmda || 0}
+                    currency
+                    unknown={!profit || profit.glpmda == null}
+                    unknownNote="No hours clocked yet, so there is no produced rate to show."
+                    expected={glpmde}
+                  />
+                </Card>
               </Group>
 
               <div className="flex flex-col lg:flex-row gap-3 items-stretch">
