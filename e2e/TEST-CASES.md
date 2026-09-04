@@ -731,3 +731,11 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   column heading by a day.
 - Day names 20px, dates 18px — roughly double. They are the first thing a PM scans, so they
   no longer inherit the 10px size shared with MODULE and COMPLETE.
+
+## Completion grid — boundary note as a heading
+
+- "current week" / "job sold this week" moved out from under the date range into its own
+  centred slot in the chooser row, at `text-base font-semibold` — a heading over the day
+  columns rather than a caption crowding the picker.
+- Both states verified in the browser: "Current week" at 8/30–9/5 with Next disabled, and
+  "Job sold this week" at 8/9–8/15 with Prev disabled.

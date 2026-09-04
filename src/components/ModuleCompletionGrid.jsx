@@ -213,12 +213,6 @@ export default function ModuleCompletionGrid({
           </button>
           <span className="text-xs text-gray-600 tabular-nums whitespace-nowrap">
             {usDate(week[0])} – {usDate(week[6])}
-            {atFloor && (
-              <span className="block text-[10px] text-gray-400 text-center">job sold this week</span>
-            )}
-            {!atFloor && atCeiling && (
-              <span className="block text-[10px] text-gray-400 text-center">current week</span>
-            )}
           </span>
           <button
             type="button"
@@ -230,6 +224,11 @@ export default function ModuleCompletionGrid({
             Next ›
           </button>
         </div>
+        {/* Centred in the row, so it reads as a heading over the day columns
+            rather than a caption crowding the date range. */}
+        <p className="flex-1 text-center text-base font-semibold text-gray-700">
+          {atFloor ? 'Job sold this week' : atCeiling ? 'Current week' : ''}
+        </p>
       </div>
 
       {error && <p className="px-4 py-2 text-xs text-red-600 bg-red-50">{error}</p>}
