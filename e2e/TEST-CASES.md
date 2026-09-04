@@ -781,3 +781,15 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   fixed `w-52`, centred, sized for the widest case (12/28/2026 – 1/3/2027).
 - Verified by walking back through four weeks and reading the Next button's x each time:
   703px throughout.
+
+## Completion grid — the week range is a date picker
+
+- Clicking the date range opens the browser's native date picker, so jumping back months
+  does not mean clicking Prev twenty times. A transparent `input[type=date]` sits over the
+  text: the picker brings month/year dropdowns, keyboard support and the right locale for
+  free, and the styled range underneath is untouched.
+- `min` is the sold week, `max` is today — the same window the arrows obey — and `onChange`
+  clamps as well, so a browser that ignored min/max could not land the grid outside its own
+  bounds.
+- Verified: picking 8/19 lands on 8/16–8/22; picking 5/4 (before the job was sold) is
+  refused and the week does not move. min/max render as 2026-08-09 / 2026-09-04.

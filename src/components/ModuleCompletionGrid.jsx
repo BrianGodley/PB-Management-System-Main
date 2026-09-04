@@ -216,8 +216,32 @@ export default function ModuleCompletionGrid({
               button sideways every time the week changed. Sized for the widest
               case (12/28/2026 – 1/3/2027) and centred, so the buttons hold
               still and the dates sit apart inside the gap. */}
-          <span className="w-52 shrink-0 text-center text-xs text-gray-600 tabular-nums whitespace-nowrap">
+          {/* Clicking the range opens the browser's own date picker, so jumping
+              back a few months does not mean clicking Prev twenty times. A
+              transparent date input sits over the text: the picker is native
+              (month and year dropdowns, keyboard support, correct locale) and
+              the text underneath stays exactly as designed.
+              min/max pin it to the same window the arrows obey, and onChange
+              clamps as well — a browser that ignores min/max would otherwise
+              land the grid outside its own bounds. */}
+          <span className="relative w-52 shrink-0 text-center text-xs text-gray-600 tabular-nums whitespace-nowrap rounded hover:bg-gray-50 hover:text-gray-900 transition-colors">
             {usDate(week[0])} – {usDate(week[6])}
+            <input
+              type="date"
+              aria-label="Jump to a week"
+              title="Pick any date to jump to that week"
+              value={weekOf}
+              min={floorWeek || undefined}
+              max={today()}
+              onChange={e => {
+                const picked = e.target.value
+                if (!picked) return
+                if (floorWeek && weekDates(picked)[0] < floorWeek) return setWeekOf(floorWeek)
+                if (weekDates(picked)[0] > ceilingWeek) return setWeekOf(ceilingWeek)
+                setWeekOf(picked)
+              }}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
           </span>
           <button
             type="button"
