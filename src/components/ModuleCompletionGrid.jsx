@@ -365,7 +365,7 @@ export default function ModuleCompletionGrid({
                 this is the line that shows the job as a whole marching to 100%. */}
             <tr className="bg-gray-50 border-t-2 border-gray-200">
               <td className="py-2 px-4 font-bold text-gray-700">
-                Job total
+                Total Job Gross Profit Earned
                 <span className="block text-[11px] font-normal text-gray-400">
                   weighted by estimated profit
                 </span>
