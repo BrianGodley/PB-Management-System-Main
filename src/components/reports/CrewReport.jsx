@@ -65,6 +65,7 @@ export default function CrewReport() {
   const [settings, setSettings] = useState(null)
   const [rangeKey, setRangeKey] = useState('3m')
   const [customOpen, setCustomOpen] = useState(false)
+  const [includeCurrent, setIncludeCurrent] = useState(true)
   const [from, setFrom] = useState(iso(new Date(Date.now() - 91 * 864e5)))
   const [to, setTo] = useState(iso(new Date()))
   const [data, setData] = useState(null)
@@ -181,6 +182,17 @@ export default function CrewReport() {
           // Same shape as the engine: earned work, less what it cost extra.
           const actGP = earned - (actLabor - elcToDate)
 
+          // A job is "current" until every module the crew owns reads 100%.
+          // That distinction is what makes the summary comparable: an
+          // unfinished job's actuals cover part of the work while its estimate
+          // covers all of it, so the two columns are measuring different
+          // amounts and the difference between them means nothing.
+          const complete = modules.length > 0 && modules.every(m => (cp.get(m.id) || 0) >= 0.9995)
+          const completion =
+            estMD > 0
+              ? modules.reduce((s, m) => s + (cp.get(m.id) || 0) * nv(m.man_days), 0) / estMD
+              : 0
+
           return {
             id: j.id,
             name: j.name || j.client_name || '—',
@@ -193,6 +205,8 @@ export default function CrewReport() {
             actLabor,
             estGP,
             actGP,
+            complete,
+            completion,
           }
         })
         .filter(r => r.actMD > 0 || r.estMD > 0)
@@ -207,8 +221,15 @@ export default function CrewReport() {
     }
   }, [crew, members, from, to, rates])
 
+  // Dropping the current jobs leaves only module sets that ran to 100%, where
+  // estimated and actual cover the same work and the variance is real.
+  const rows = useMemo(() => {
+    const all = data?.jobs || []
+    return includeCurrent ? all : all.filter(r => r.complete)
+  }, [data, includeCurrent])
+  const currentCount = useMemo(() => (data?.jobs || []).filter(r => !r.complete).length, [data])
+
   const totals = useMemo(() => {
-    const rows = data?.jobs || []
     const t = rows.reduce(
       (a, r) => ({
         estMD: a.estMD + r.estMD,
@@ -229,7 +250,7 @@ export default function CrewReport() {
       estGlpmd: t.estMD > 0 ? t.estGP / t.estMD : null,
       actGlpmd: t.actMD > 0 ? t.actGP / t.actMD : null,
     }
-  }, [data])
+  }, [rows])
 
   if (!rates) {
     return (
@@ -283,6 +304,32 @@ export default function CrewReport() {
         >
           {usDate(from)} – {usDate(to)} <span className="text-gray-400 ml-1">▾</span>
         </button>
+
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+          <button
+            onClick={() => setIncludeCurrent(true)}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              includeCurrent
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            All jobs
+          </button>
+          <button
+            onClick={() => setIncludeCurrent(false)}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              !includeCurrent
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Completed only
+            {currentCount > 0 && (
+              <span className="ml-1.5 text-xs text-gray-400">−{currentCount}</span>
+            )}
+          </button>
+        </div>
       </div>
 
       {customOpen && (
@@ -372,10 +419,14 @@ export default function CrewReport() {
           <div className="flex items-center justify-center py-16">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700"></div>
           </div>
-        ) : !data?.jobs?.length ? (
+        ) : !rows.length ? (
           <div className="text-center py-16 text-gray-400">
             <p className="text-3xl mb-2">👷</p>
-            <p className="text-sm">Crew {crew?.label} clocked no hours in this range.</p>
+            <p className="text-sm">
+              {data?.jobs?.length
+                ? `Crew ${crew?.label} finished no jobs in this range — every one is still current.`
+                : `Crew ${crew?.label} clocked no hours in this range.`}
+            </p>
           </div>
         ) : (
           <table className="w-full">
@@ -397,10 +448,15 @@ export default function CrewReport() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {data.jobs.map(r => (
+              {rows.map(r => (
                 <tr key={r.id} className="hover:bg-gray-50">
                   <td className="px-3 py-2.5 text-base text-left">
                     <span className="font-semibold text-gray-900">{r.name}</span>
+                    {!r.complete && (
+                      <span className="ml-2 align-middle rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                        current · {Math.round(r.completion * 100)}%
+                      </span>
+                    )}
                     <span className="block text-xs text-gray-400">
                       {r.moduleNames.length ? r.moduleNames.join(' · ') : 'no modules assigned'}
                     </span>
@@ -427,7 +483,7 @@ export default function CrewReport() {
             <tfoot className="sticky bottom-0 bg-gray-50 border-t-2 border-gray-200">
               <tr>
                 <td className="px-3 py-2.5 text-base font-bold text-gray-800">
-                  {data.jobs.length} job{data.jobs.length === 1 ? '' : 's'}
+                  {rows.length} job{rows.length === 1 ? '' : 's'}
                 </td>
                 <td className="px-3 py-2.5 text-base text-center font-mono font-bold">
                   {num(totals.estMD)}
