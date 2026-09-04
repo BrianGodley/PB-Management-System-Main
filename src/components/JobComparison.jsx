@@ -96,7 +96,7 @@ function Pair({
         ? 'text-red-400'
         : 'text-green-400'
   return (
-    <div className="flex-1 min-w-0 px-9 py-1.5">
+    <div className="flex-1 min-w-0 px-2 xl:px-5 2xl:px-9 py-1.5">
       {/* The card border does the grouping now, so the pair can sit wider than
           it did in the old single bar — but not edge to edge, which read as two
           separate figures again. */}
@@ -1107,8 +1107,8 @@ export default function JobComparison({ job }) {
                 </Card>
                 <Card accent="border-blue-400/70">
                   <Pair
-                    estLabel="Estimated GP"
-                    actLabel="Actual GP"
+                    estLabel="Estimated Gross Profit"
+                    actLabel="Actual Gross Profit"
                     est={profit ? profit.glpeTotal : 0}
                     act={profit ? profit.glpa : 0}
                     currency
