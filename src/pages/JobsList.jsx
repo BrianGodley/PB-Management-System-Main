@@ -11,6 +11,7 @@ import JobComparison from '../components/JobComparison'
 import TemplatesManager from '../components/TemplatesManager'
 import EmailTemplatesManager from '../components/EmailTemplatesManager'
 import AllJobsTracking from '../components/AllJobsTracking'
+import CrewReport from '../components/reports/CrewReport'
 import AllJobsTasks from '../components/AllJobsTasks'
 import AllJobsChangeOrders from '../components/AllJobsChangeOrders'
 import MasterCrews from './MasterCrews'
@@ -1319,10 +1320,12 @@ export default function JobsList() {
     { key: 'change-orders', label: '🔄 Change Orders' },
     { key: 'finance', label: '💰 Finance' },
     { key: 'files', label: '📁 Files' },
+    { key: 'reports', label: '📊 Reports' },
     ...(isAdmin ? [{ key: 'settings', label: '⚙️ Settings' }] : []),
   ]
   // Active tab's label without the leading emoji — used in the breadcrumb.
   const tabName = (TABS.find(t => t.key === tab)?.label || '').replace(/^\S+\s+/, '')
+  const [reportTab, setReportTab] = useState('crew')
 
   return (
     <div className="flex flex-col h-full">
@@ -2046,6 +2049,29 @@ export default function JobsList() {
               />
             )}
             {tab === 'files' && <JobFilesPanel job={selectedJobObj} />}
+
+            {/* Reports read ACROSS jobs, so they ignore the job picker — the
+                crew and the date range are the selection here. */}
+            {tab === 'reports' && (
+              <div className="flex flex-col h-full min-h-0">
+                <div className="flex border-b border-gray-200 mb-4 flex-shrink-0">
+                  {[{ key: 'crew', label: '👷 Crew' }].map(t => (
+                    <button
+                      key={t.key}
+                      onClick={() => setReportTab(t.key)}
+                      className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                        reportTab === t.key
+                          ? 'border-green-700 text-green-800 bg-green-50'
+                          : 'border-transparent text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+                {reportTab === 'crew' && <CrewReport />}
+              </div>
+            )}
           </div>
         </div>
       )}

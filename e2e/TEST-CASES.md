@@ -1064,3 +1064,24 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   all crews 5 rows / 32 → 33 MD / $8,102, one crew 2 rows / 9.5 → 12 MD / $2,405.
 - A full-screen click-away layer closes the dropdown; one that only closes via its own button
   gets left open by accident.
+
+## Reports tab — Crew report
+
+- New **📊 Reports** tab after Files in Project Management, with sub-tabs in the Files/Finance
+  style. First sub-tab is **👷 Crew**.
+- `components/reports/CrewReport.jsx`. Everything is scoped to the CREW, not the job: a job's
+  estimate row counts only the modules that crew was assigned, and its actuals only the hours
+  that crew clocked. A job worked by three crews appears in three reports, each with its own
+  slice.
+- Crew picker · six preset ranges (1 week, 3 weeks, 1, 3, 6, 12 months) · the range itself is
+  a button opening From/To date inputs, which switch the selection to "custom".
+- Summary panel, dark like the Tracking bar, twelve large boxes: estimated/actual hours,
+  estimated/actual man days, standard and overtime hours, estimated/actual labour cost,
+  estimated/actual gross profit, estimated/actual GLPMD. Each actual is coloured against its
+  estimate, with less being good for hours and cost, more for profit.
+- Below it, one row per job: estimated and actual man days, estimated and actual labour, and
+  the modules that crew held. Totals row follows.
+- Jobs come from the crew's OWN SHIFTS in the window, not from work-order assignment — a
+  work order assigned but never clocked into is not work done.
+- Verified live: Crew A over 3 months shows 10 jobs, 69.1 → 65.7 MD, $17,496 → $16,845
+  labour, $32,705 → $29,667 GP, $473.30 → $451.59 GLPMD, 13 overtime hours.
