@@ -558,3 +558,19 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   percent entry, plus Complete % and GP earned per module. A "Jump to first entry" button
   goes to the first week with readings, since a job that ran last month opens on an empty
   current week otherwise.
+
+## Tracking KPI cards — matching rates, matching man-days, and "not yet known"
+
+- LABOR COST compared unlike things on each side. Estimated came from
+  `work_orders.labor_cost` (man-days × `avg_hourly_crew_rate` × 8 = $253.20/MD); actual used
+  `labor_rate_per_man_day` ($317.36/MD, a separate setting 25% higher) multiplied by
+  SCHEDULED man-days rather than clocked. Test Tester1 read $12,377 actual (39 MD × $317.36)
+  against $9,470 estimated — a 31% overrun reported on a job that finished early and under
+  budget. Actual is now `profit.rlc`: clocked hours at the same burdened rate the estimate
+  uses, with overtime at the multiplier. Tester1 now reads $7,707.
+- MATERIAL COST showed $0 actual when no bills are linked, which reads as "we spent nothing"
+  rather than "we have not been billed". `KpiCard` gained an `unknown` state rendering
+  "not yet known"; material uses it whenever `bills.length === 0`.
+- Tester1's four cards now tell one coherent story: 37.4 → 30.4 MD, $9,470 → $7,707 labour,
+  material not yet known, $24,378 → $26,141 profit at $550 → $734/MD. The arithmetic ties:
+  $20,570 earned + $1,763 labour saved + $3,808 sub = $26,141.

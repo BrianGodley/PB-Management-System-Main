@@ -60,7 +60,10 @@ function DeltaBadge({ est, act, currency = false, inverse = false }) {
   )
 }
 
-function KpiCard({ label, est, act, currency = false }) {
+function KpiCard({ label, est, act, currency = false, unknown = false, unknownNote }) {
+  // act === null means NOT KNOWN YET, which is a different fact from zero.
+  // Material cost with no bills linked is the case that matters: showing $0
+  // reads as "we spent nothing" when it means "we have not been billed yet".
   const display = v => (currency ? fmt(v) : fmtD(v))
   return (
     <div className="bg-white rounded-xl border border-gray-200 px-3 py-2 flex flex-col gap-0.5 min-w-0 overflow-hidden">
@@ -74,7 +77,13 @@ function KpiCard({ label, est, act, currency = false }) {
         </div>
         <div className="text-right min-w-0 flex-1">
           <p className="text-[10px] text-gray-400">Actual</p>
-          <p className="text-sm sm:text-base font-bold text-gray-900 truncate">{display(act)}</p>
+          {unknown ? (
+            <p className="text-sm sm:text-base font-bold text-gray-400 truncate" title={unknownNote}>
+              not yet known
+            </p>
+          ) : (
+            <p className="text-sm sm:text-base font-bold text-gray-900 truncate">{display(act)}</p>
+          )}
         </div>
       </div>
     </div>
@@ -1034,10 +1043,11 @@ export default function JobComparison({ job }) {
             <KpiCard
               label="Labor Cost"
               est={c.estLaborCost}
-              act={c.actLaborCost}
+              act={profit ? profit.rlc : c.actLaborCost}
               currency
               inverse
-              sub={`@ ${fmt(laborRate)}/MD`}
+              unknown={!profit}
+              unknownNote="Set the crew rate and overtime multiplier in HR → Labor Rates."
             />
             <KpiCard
               label="Material Cost"
@@ -1045,11 +1055,8 @@ export default function JobComparison({ job }) {
               act={c.actMaterialCost}
               currency
               inverse
-              sub={
-                bills.length > 0
-                  ? `${bills.length} bill${bills.length !== 1 ? 's' : ''} recorded`
-                  : 'No bills recorded yet'
-              }
+              unknown={bills.length === 0}
+              unknownNote="No vendor bills or card charges are linked to this job yet."
             />
             <GpCard
               profit={profit}
