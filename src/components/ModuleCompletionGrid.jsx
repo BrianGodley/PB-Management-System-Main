@@ -39,6 +39,36 @@ export default function ModuleCompletionGrid({ jobId, modules, completions, rows
     return { first: dates[0], last: dates[dates.length - 1] }
   }, [completions])
 
+  // The cumulative reading in force on `date` — the latest entry on or before
+  // it, which is NOT the same as the cell's own value: a module worked Monday
+  // and idle Tuesday still stands at Monday's percentage on Tuesday.
+  const cumAt = (moduleId, date) => {
+    let best = null
+    for (const c of completions || []) {
+      if (c.estimate_module_id !== moduleId || c.entry_date > date) continue
+      if (!best || c.entry_date > best.entry_date) best = c
+    }
+    return best ? parseFloat(best.completion_pct) || 0 : 0
+  }
+  const prevDay = date => {
+    const d = new Date(`${date}T00:00:00`)
+    d.setDate(d.getDate() - 1)
+    return d.toISOString().slice(0, 10)
+  }
+  // The day's gain for one module, and for the job as a whole. The job figure is
+  // weighted by each module's estimated profit, so finishing a big module moves
+  // the number more than finishing a small one — the same weighting the profit
+  // engine uses, which is why the row lands on 100% exactly when the job does.
+  const gain = (moduleId, date) => cumAt(moduleId, date) - cumAt(moduleId, prevDay(date))
+  const glpeTotal = (modules || []).reduce((sum, m) => sum + (parseFloat(m.gross_profit) || 0), 0)
+  const jobCumAt = date =>
+    glpeTotal > 0
+      ? (modules || []).reduce(
+          (sum, m) => sum + cumAt(m.id, date) * (parseFloat(m.gross_profit) || 0),
+          0
+        ) / glpeTotal
+      : 0
+
   const cellValue = (moduleId, date) => {
     const row = (completions || []).find(
       c => c.estimate_module_id === moduleId && c.entry_date === date
@@ -203,6 +233,22 @@ export default function ModuleCompletionGrid({ jobId, modules, completions, rows
                           placeholder="—"
                           className="w-14 text-center border border-gray-300 rounded px-1 py-1 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
                         />
+                        {/* The day's gain, so the sequence reads as progress
+                            rather than a column of unrelated percentages. */}
+                        {cellValue(m.id, d) !== '' && (
+                          <span
+                            className={`block text-[10px] tabular-nums mt-0.5 ${
+                              gain(m.id, d) > 0
+                                ? 'text-green-600'
+                                : gain(m.id, d) < 0
+                                  ? 'text-red-500'
+                                  : 'text-gray-300'
+                            }`}
+                          >
+                            {gain(m.id, d) > 0 ? '+' : ''}
+                            {Math.round(gain(m.id, d))}%
+                          </span>
+                        )}
                       </td>
                     )
                   })}
@@ -215,6 +261,46 @@ export default function ModuleCompletionGrid({ jobId, modules, completions, rows
                 </tr>
               )
             })}
+            {/* Job total — every module's cumulative reading weighted by its
+                estimated profit. Modules run in sequence and sometimes overlap;
+                this is the line that shows the job as a whole marching to 100%. */}
+            <tr className="bg-gray-50 border-t-2 border-gray-200">
+              <td className="py-2 px-4 font-bold text-gray-700">
+                Job total
+                <span className="block text-[11px] font-normal text-gray-400">
+                  weighted by estimated profit
+                </span>
+              </td>
+              {week.map(d => {
+                const cum = jobCumAt(d)
+                const delta = cum - jobCumAt(prevDay(d))
+                return (
+                  <td key={d} className="py-2 px-1 text-center">
+                    <span className="block text-sm font-bold tabular-nums text-gray-800">
+                      {Math.round(cum)}%
+                    </span>
+                    <span
+                      className={`block text-[10px] tabular-nums ${
+                        delta > 0 ? 'text-green-600' : 'text-gray-300'
+                      }`}
+                    >
+                      {delta > 0 ? `+${delta.toFixed(1)}%` : '—'}
+                    </span>
+                  </td>
+                )
+              })}
+              <td className="py-2 px-4 text-right tabular-nums font-bold text-gray-800">
+                {Math.round(jobCumAt(week[6]))}%
+              </td>
+              <td className="py-2 px-4 text-right tabular-nums font-bold text-green-700">
+                {fmt(
+                  (rows || []).reduce(
+                    (sum, r) => sum + r.earnedLaborGp + (r.earnedSubGp || 0),
+                    0
+                  )
+                )}
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>

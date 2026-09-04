@@ -574,3 +574,21 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - Tester1's four cards now tell one coherent story: 37.4 → 30.4 MD, $9,470 → $7,707 labour,
   material not yet known, $24,378 → $26,141 profit at $550 → $734/MD. The arithmetic ties:
   $20,570 earned + $1,763 labour saved + $3,808 sub = $26,141.
+
+## Completion progression + 5 in-progress jobs to enter against
+
+- The grid now shows PROGRESSION, not isolated percentages. Each entered cell carries the
+  day's gain beneath it (+5%, +16%), and a **Job total** row sums every module's cumulative
+  reading weighted by estimated profit — the same weighting the engine uses, so the row
+  reaches 100% exactly when the job does. `cumAt()` reads the latest entry on or before a
+  date, so a module worked Monday and idle Tuesday still stands at Monday's figure.
+- `scripts/seed-inprogress-jobs.py` seeds Test Active1–5, deliberately UNFINISHED, running
+  from ~2 weeks ago to today so the grid opens on live data. Five shapes: sequential with
+  two done · just started · all six overlapping · nearly finished · stalled mid-job. Each
+  carries a labour efficiency (0.88–1.30) so the five read differently.
+- SEED BUG worth recording: the first version gave every overlapping module a full crew for
+  the whole window, so Active3 burned 106 man-days against 44.2 estimated on a job a third
+  complete and reported −$16,232 profit. Arithmetically correct, uselessly unrealistic.
+  Hours are now derived from completion: `emd × 8 × (pct/100) × efficiency`.
+- Modules at `None` get no readings and no hours at all — "never started" rather than a
+  stored zero.

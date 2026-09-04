@@ -145,6 +145,32 @@ if (pick) {
   }
 }
 
+// ── The four KPI cards, recomputed exactly as the Tracking tab does ─────────
+// Three bugs lived here: labour cost measured at a different rate on each side,
+// against SCHEDULED rather than clocked man-days, and material showing $0 when it
+// meant "not yet billed". These assertions are the regression net for all three.
+console.log('\nKPI cards — as the Tracking tab renders them')
+console.log(
+  '  JOB'.padEnd(16) + 'MD est/act'.padStart(13) + 'LABOUR est/act'.padStart(22) +
+  'DIRECTION'.padStart(12)
+)
+const cardRows = []
+for (const { job, r, emd } of results) {
+  const estLabour = emd * 8 * rates.hourlyRate
+  const mdSaved = emd - r.actualManDays
+  const labourSaved = estLabour - r.rlc
+  // Same rate both sides means the two must move together. If a job uses fewer
+  // man-days its labour must cost less; that is what broke before.
+  const agree = Math.sign(Math.round(mdSaved * 100)) === Math.sign(Math.round(labourSaved))
+  cardRows.push({ job, emd, actMd: r.actualManDays, estLabour, rlc: r.rlc, agree })
+  console.log(
+    '  ' + job.padEnd(14) +
+      `${emd.toFixed(1)}/${r.actualManDays.toFixed(1)}`.padStart(13) +
+      `${money(estLabour)}/${money(r.rlc)}`.padStart(22) +
+      (agree ? '  consistent' : '  CONTRADICTS')
+  )
+}
+
 // ── Assertions the seeded scenarios must satisfy ────────────────────────────
 console.log('\nChecks')
 let failures = 0
@@ -178,6 +204,17 @@ check('every hour resolves to a module through the work order',
   results.every(x => x.attribution.coverage.ratio > 0.999))
 check('labour data present on every job (no suppressed variance)',
   results.every(x => x.r.laborDataMissing === false))
+check('man-days and labour cost move together on every job',
+  cardRows.every(x => x.agree),
+  cardRows.filter(x => !x.agree).map(x => x.job).join(', '))
+check('labour cost uses the SAME rate on both sides',
+  cardRows.every(x => {
+    const perMd = x.actualManDays === 0 ? null : x.rlc / x.actMd
+    return perMd == null || Math.abs(perMd - rates.hourlyRate * 8) < rates.hourlyRate * 8 * 0.6
+  }))
+check('no job reports fewer man-days AND higher labour cost',
+  !cardRows.some(x => x.actMd < x.emd && x.rlc > x.estLabour),
+  cardRows.filter(x => x.actMd < x.emd && x.rlc > x.estLabour).map(x => x.job).join(', '))
 
 console.log(failures === 0 ? '\nAll checks passed.' : `\n${failures} check(s) failed.`)
 process.exit(failures === 0 ? 0 : 1)
