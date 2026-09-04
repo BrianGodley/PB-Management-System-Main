@@ -793,3 +793,8 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   bounds.
 - Verified: picking 8/19 lands on 8/16–8/22; picking 5/4 (before the job was sold) is
   refused and the week does not move. min/max render as 2026-08-09 / 2026-09-04.
+
+- FOLLOW-UP: clicking the range did nothing at first. Chrome only opens a date input's
+  picker when the click lands on its calendar indicator, and ours is transparent — the click
+  has to call `showPicker()` itself. Wrapped in try/catch: it throws on browsers without it,
+  where the field stays focusable and typable, so failing quietly is the right behaviour.

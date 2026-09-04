@@ -233,6 +233,18 @@ export default function ModuleCompletionGrid({
               value={weekOf}
               min={floorWeek || undefined}
               max={today()}
+              // Chrome only opens the picker when the click lands on the
+              // calendar indicator, and ours is invisible — so the click has to
+              // ask for it. showPicker() throws if the browser lacks it or the
+              // call is not user-activated; either way the input still works
+              // through the keyboard, so failing quietly is correct.
+              onClick={e => {
+                try {
+                  e.currentTarget.showPicker()
+                } catch {
+                  /* older browser — the field is still focusable and typable */
+                }
+              }}
               onChange={e => {
                 const picked = e.target.value
                 if (!picked) return
