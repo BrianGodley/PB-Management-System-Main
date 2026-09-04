@@ -49,6 +49,11 @@ export default function ModuleCompletionGrid({
     [jobStartDate]
   )
   const atFloor = floorWeek != null && week[0] <= floorWeek
+
+  // The other end: nobody can report work that has not happened. The current
+  // week is the ceiling, so a reading can never be post-dated into next month.
+  const ceilingWeek = useMemo(() => weekDates(today())[0], [])
+  const atCeiling = week[0] >= ceilingWeek
   const earned = useMemo(() => {
     const m = new Map()
     for (const r of rows || []) m.set(r.id, r)
@@ -158,9 +163,10 @@ export default function ModuleCompletionGrid({
     const d = new Date(`${weekOf}T00:00:00`)
     d.setDate(d.getDate() + days)
     const next = d.toISOString().slice(0, 10)
-    // Clamp rather than ignore, so a click at the boundary still lands on the
-    // first week instead of appearing to do nothing.
+    // Clamp at both ends rather than ignoring the click, so a jump from further
+    // out still lands on the boundary week instead of appearing to do nothing.
     if (floorWeek && weekDates(next)[0] < floorWeek) return setWeekOf(floorWeek)
+    if (weekDates(next)[0] > ceilingWeek) return setWeekOf(ceilingWeek)
     setWeekOf(next)
   }
 
@@ -208,11 +214,16 @@ export default function ModuleCompletionGrid({
             {atFloor && (
               <span className="block text-[10px] text-gray-400 text-center">job sold this week</span>
             )}
+            {!atFloor && atCeiling && (
+              <span className="block text-[10px] text-gray-400 text-center">current week</span>
+            )}
           </span>
           <button
             type="button"
             onClick={() => shift(7)}
-            className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
+            disabled={atCeiling}
+            title={atCeiling ? 'This is the current week — work cannot be reported before it happens.' : undefined}
+            className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
           >
             Next ›
           </button>
@@ -252,6 +263,10 @@ export default function ModuleCompletionGrid({
                   </td>
                   {week.map(d => {
                     const key = `${m.id}|${d}`
+                    // Even inside the current week, Thursday cannot be reported
+                    // on Tuesday. Existing readings still render, so nothing is
+                    // hidden — the cell just stops accepting new ones.
+                    const isFuture = d > today()
                     return (
                       <td key={d} className="py-1 px-1 text-center">
                         <input
@@ -261,7 +276,8 @@ export default function ModuleCompletionGrid({
                           defaultValue={cellValue(m.id, d)}
                           key={`${key}|${cellValue(m.id, d)}`}
                           onBlur={e => save(m.id, d, e.target.value)}
-                          disabled={saving === key}
+                          disabled={saving === key || isFuture}
+                          title={isFuture ? 'This day has not happened yet.' : undefined}
                           placeholder="—"
                           className="w-14 text-center border border-gray-300 rounded px-1 py-1 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
                         />

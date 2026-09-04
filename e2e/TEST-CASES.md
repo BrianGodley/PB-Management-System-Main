@@ -607,3 +607,14 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
   disable the button the user needs.
 - Verified on Test Active1 (sold 2026-08-09): three clicks back reach 2026-08-09 – 08-15 and
   Prev disables.
+
+## Completion grid — bounded at both ends
+
+- Next now stops at the CURRENT week, mirroring the sold-date floor: work cannot be reported
+  before it happens. The range label reads "current week" and the button explains itself on
+  hover. `shift()` clamps at both ends.
+- Days still in the future WITHIN the current week are individually locked — Thursday cannot
+  be filled in on Tuesday. Existing readings still render (nothing is hidden); the cell just
+  refuses new input, with a "this day has not happened yet" tooltip.
+- Verified on Test Active1 on Fri 2026-09-04: week 08-30 – 09-05, Next disabled, and 6 of 42
+  cells locked — Saturday across all six modules.
