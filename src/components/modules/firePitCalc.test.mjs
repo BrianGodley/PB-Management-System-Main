@@ -9,6 +9,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   computeCapRow,
+  computeFillRow,
+  fillUnitPrice,
   computeFinishRow,
   resolveLabor,
   WF_META as CANON_WF_META,
@@ -224,4 +226,62 @@ test('contract: every canonical finish prices material + labor once resolved', (
     assert.ok(r.mat > 0, `${type}: material should be > 0 at 20 SF × $10`)
     assert.ok(r.hrs > 0, `${type}: labor hours should be > 0 at 20 SF × 0.3 hr/SF`)
   }
+})
+
+// ── Fire pit fill ───────────────────────────────────────────────────────────
+// Fill is bought by the bag and estimated by the cubic foot, so the conversion
+// between the two is the thing most likely to go quietly wrong.
+const HD_LAVA = {
+  name: 'Bagged Red Lava Rock 3/4 in. - .5 Cu Ft',
+  unit_cost: 7.4,
+  calc_meta: { cu_ft_per_unit: 0.5 },
+}
+const FILL_LAB = 'FP Fill Labor Rate'
+
+test('fill: a bag price converts to a per-Cu-Ft price', () => {
+  // $7.40 for half a cubic foot is $14.80 the cubic foot, not $7.40.
+  assert.equal(fillUnitPrice(HD_LAVA), 14.8)
+})
+
+test('fill: a product with no coverage recorded is already priced per Cu Ft', () => {
+  assert.equal(fillUnitPrice({ unit_cost: 12, calc_meta: {} }), 12)
+  assert.equal(fillUnitPrice({ unit_cost: 12 }), 12)
+})
+
+test('fill: material and labor both price off cubic feet', () => {
+  const r = computeFillRow(
+    { cuft: 6, type: HD_LAVA.name },
+    { item: HD_LAVA, mp: { [FILL_LAB]: 0.25 }, labName: FILL_LAB }
+  )
+  assert.equal(r.unit, 14.8)
+  assert.equal(r.mat, 6 * 14.8)
+  assert.equal(r.hrs, 1.5)
+  assert.equal(r.laborUnset, null)
+})
+
+test('fill: an unset labor rate reads 0 hours AND flags itself', () => {
+  const r = computeFillRow(
+    { cuft: 6, type: HD_LAVA.name },
+    { item: HD_LAVA, mp: {}, labName: FILL_LAB }
+  )
+  assert.equal(r.hrs, 0)
+  assert.ok(r.mat > 0, 'material still prices — only the labor rate is missing')
+  assert.equal(r.laborUnset?.kind, 'labor')
+  assert.equal(r.laborUnset?.name, FILL_LAB)
+})
+
+test('fill: an unselected row or zero quantity prices at nothing', () => {
+  const mp = { [FILL_LAB]: 0.25 }
+  assert.deepEqual(computeFillRow({ cuft: 6, type: '' }, { item: null, mp, labName: FILL_LAB }), {
+    mat: 0,
+    hrs: 0,
+    unit: 0,
+    laborUnset: null,
+  })
+  const zero = computeFillRow(
+    { cuft: 0, type: HD_LAVA.name },
+    { item: HD_LAVA, mp, labName: FILL_LAB }
+  )
+  assert.equal(zero.mat, 0)
+  assert.equal(zero.hrs, 0)
 })
