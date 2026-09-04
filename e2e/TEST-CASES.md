@@ -648,3 +648,14 @@ type tabs). NON-DESTRUCTIVE. Uses shared helpers.openModule/scanEveryOptionForNa
 - Tones shift one step lighter on black: `text-green-400` / `text-red-400` rather than
   `-700` / `-600`, values in white, labels `text-gray-400`, and the muted states
   ("not yet known", "no markup set", "due by now") in `text-gray-500`.
+
+## Summary bar — labels on the values, sub cost dropped
+
+- In House Labor lost its shared column headings and the EST/ACTUAL abbreviations. Each
+  value now carries its own label: Estimated/Actual Man Days, Estimated/Actual Labor Cost,
+  Estimated/Actual GP. One line to read instead of two.
+- Subcontractors carries Gross Profit alone — cost is fixed at estimate and told a tracking
+  view nothing. `subCostTotal` removed as orphaned.
+- All ten labels verified at the same pixel offset; the spacer that had aligned the
+  single-value columns is gone, since Pair no longer has an extra row to match.
+- Widths rebalanced 7/2/4 for three labelled pairs, one value, three values.

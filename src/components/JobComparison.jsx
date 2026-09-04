@@ -71,7 +71,8 @@ function DeltaBadge({ est, act, currency = false, inverse = false }) {
 
 // A metric with an estimated and an actual side.
 function Pair({
-  label,
+  estLabel,
+  actLabel,
   est,
   act,
   currency = false,
@@ -98,15 +99,14 @@ function Pair({
         : 'text-green-400'
   return (
     <div className="flex-1 min-w-0 px-3 py-1.5">
-      <p className="text-[10px] font-bold text-gray-300 text-center truncate">{label}</p>
-      <div className="flex items-start justify-between gap-2 mt-0.5 min-w-0">
+      <div className="flex items-start justify-between gap-3 min-w-0">
         <div className="min-w-0">
-          <p className="text-[9px] text-gray-500 uppercase tracking-wide">Est</p>
+          <p className="text-[10px] font-bold text-gray-300 truncate">{estLabel}</p>
           <p className="text-sm font-bold text-white tabular-nums truncate">{display(est)}</p>
           {estSub && <p className="text-[10px] text-gray-500 tabular-nums truncate">{estSub}</p>}
         </div>
         <div className="text-right min-w-0">
-          <p className="text-[9px] text-gray-500 uppercase tracking-wide">Actual</p>
+          <p className="text-[10px] font-bold text-gray-300 truncate">{actLabel}</p>
           {unknown ? (
             <p className="text-sm font-bold text-gray-500 truncate" title={unknownNote}>
               not yet known
@@ -128,13 +128,6 @@ function Single({ label, value, currency = false, unknown = false, unknownNote, 
   return (
     <div className="flex-1 min-w-0 px-3 py-1.5">
       <p className="text-[10px] font-bold text-gray-300 text-center truncate">{label}</p>
-      {/* Single had `self-center`, which floated its label to the middle of the
-          group while the Pair labels sat at the top. Both now start at the top,
-          and this spacer stands in for the EST/ACTUAL row so the VALUES line up
-          across all three groups too, not just the headings. */}
-      <p className="text-[9px] uppercase tracking-wide mt-0.5" aria-hidden="true">
-        &nbsp;
-      </p>
       {unknown ? (
         <p className="text-sm font-bold text-gray-500 truncate" title={unknownNote}>
           not yet known
@@ -986,12 +979,6 @@ export default function JobComparison({ job }) {
         : null,
     [estModules, completions, timeEntries, rates, attribution]
   )
-  // From the estimate modules, so cost and profit come from ONE source. The
-  // work_orders is_subcontractor flag is a different thing and disagreed.
-  const subCostTotal = useMemo(
-    () => estModules.reduce((sum, m) => sum + nv(m.sub_cost), 0),
-    [estModules]
-  )
   const materialGp = useMemo(
     () =>
       estModules.reduce(
@@ -1074,11 +1061,12 @@ export default function JobComparison({ job }) {
             <div className="flex flex-col lg:flex-row gap-3 items-stretch">
               <Group
                 title="In House Labor"
-                grow="lg:flex-[6_1_0%]"
+                grow="lg:flex-[7_1_0%]"
                 accent={{ text: 'text-blue-700', border: 'border-blue-400/70' }}
               >
                 <Pair
-                  label="Man Days"
+                  estLabel="Estimated Man Days"
+                  actLabel="Actual Man Days"
                   est={c.estManDays}
                   act={profit ? profit.actualManDays : c.actManDays}
                   inverse
@@ -1088,7 +1076,8 @@ export default function JobComparison({ job }) {
                   }
                 />
                 <Pair
-                  label="Labor Cost"
+                  estLabel="Estimated Labor Cost"
+                  actLabel="Actual Labor Cost"
                   est={c.estLaborCost}
                   act={profit ? profit.rlc : c.actLaborCost}
                   currency
@@ -1099,7 +1088,8 @@ export default function JobComparison({ job }) {
                   estSub={profit ? `${fmt(profit.elcToDate)} due by now` : null}
                 />
                 <Pair
-                  label="Gross Profit Produced"
+                  estLabel="Estimated GP"
+                  actLabel="Actual GP"
                   est={profit ? profit.glpeTotal : 0}
                   act={profit ? profit.glpa : 0}
                   currency
@@ -1113,12 +1103,11 @@ export default function JobComparison({ job }) {
 
               <Group
                 title="Subcontractors"
-                grow="lg:flex-[3_1_0%]"
+                grow="lg:flex-[2_1_0%]"
                 accent={{ text: 'text-orange-600', border: 'border-orange-400/70' }}
               >
                 {/* Sub costs are fixed at estimate, so there is no estimated-vs-
                     actual to draw. The earned note is the only thing that moves. */}
-                <Single label="Cost" value={subCostTotal} currency />
                 <Single
                   label="Gross Profit"
                   value={profit ? profit.subTotal : 0}
