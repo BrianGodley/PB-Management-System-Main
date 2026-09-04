@@ -117,9 +117,9 @@ export default function CrewReport() {
       // Start from the CREW's own shifts in the window. That is the only set
       // that defines "jobs this crew worked" — a work order assigned but never
       // clocked into is not work done.
-      const entries = (
-        await fetchAllIn('time_entries', 'employee_id', members, '*')
-      ).filter(e => e.date >= from && e.date <= to && e.job_id)
+      const entries = (await fetchAllIn('time_entries', 'employee_id', members, '*')).filter(
+        e => e.date >= from && e.date <= to && e.job_id
+      )
       if (cancelled) return
 
       const jobIds = [...new Set(entries.map(e => e.job_id))]
@@ -171,7 +171,8 @@ export default function CrewReport() {
           const estGP = modules.reduce((s, m) => s + nv(m.gross_profit), 0)
           const earned = modules.reduce((s, m) => s + (cp.get(m.id) || 0) * nv(m.gross_profit), 0)
           const elcToDate = modules.reduce(
-            (s, m) => s + (cp.get(m.id) || 0) * nv(m.man_days) * HOURS_PER_MAN_DAY * rates.hourlyRate,
+            (s, m) =>
+              s + (cp.get(m.id) || 0) * nv(m.man_days) * HOURS_PER_MAN_DAY * rates.hourlyRate,
             0
           )
           const actLabor =
@@ -230,14 +231,11 @@ export default function CrewReport() {
     }
   }, [data])
 
-  const rangeLabel =
-    RANGES.find(r => r.key === rangeKey)?.label || `${usDate(from)} – ${usDate(to)}`
-
   if (!rates) {
     return (
       <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-        Labour rates are not set, so crew costs cannot be calculated. Set the crew rate and
-        overtime multiplier in HR → Labor Rates.
+        Labour rates are not set, so crew costs cannot be calculated. Set the crew rate and overtime
+        multiplier in HR → Labor Rates.
       </div>
     )
   }
@@ -326,25 +324,46 @@ export default function CrewReport() {
       )}
 
       {/* ── Summary ──────────────────────────────────────────────────────── */}
-      <div className="rounded-xl border-2 border-green-700 bg-gray-900 p-4 mb-4 flex-shrink-0">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-green-400 mb-3">
-          Crew {crew?.label} · {rangeLabel} · {data?.jobs?.length || 0} job
-          {data?.jobs?.length === 1 ? '' : 's'}
-        </p>
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-          <Box label="Estimated Hours" value={num(totals.estHours, 0)} />
-          <Box label="Actual Hours" value={num(totals.actHours, 0)} compare={[totals.actHours, totals.estHours, true]} />
-          <Box label="Estimated Man Days" value={num(totals.estMD)} />
-          <Box label="Actual Man Days" value={num(totals.actMD)} compare={[totals.actMD, totals.estMD, true]} />
-          <Box label="Standard Hours" value={num(totals.standard, 0)} />
-          <Box label="Overtime Hours" value={num(totals.overtime, 0)} tone={totals.overtime > 0 ? 'text-red-400' : 'text-white'} />
-          <Box label="Estimated Labor Cost" value={money(totals.estLabor)} />
-          <Box label="Actual Labor Cost" value={money(totals.actLabor)} compare={[totals.actLabor, totals.estLabor, true]} />
-          <Box label="Estimated Gross Profit" value={money(totals.estGP)} />
-          <Box label="Actual Gross Profit" value={money(totals.actGP)} compare={[totals.actGP, totals.estGP, false]} />
-          <Box label="Estimated GLPMD" value={money2(totals.estGlpmd)} />
-          <Box label="Actual GLPMD" value={money2(totals.actGlpmd)} compare={[totals.actGlpmd, totals.estGlpmd, false]} />
-        </div>
+      {/* One card per pair, so a figure and the thing it is measured against sit
+          together. Man days are not shown: at eight hours to the day they are
+          the hours column restated, and two ways of saying one thing is what
+          makes a summary hard to read. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 mb-4 flex-shrink-0">
+        <PairCard
+          leftLabel="Estimated Hours"
+          left={num(totals.estHours, 0)}
+          rightLabel="Actual Hours"
+          right={num(totals.actHours, 0)}
+          compare={[totals.actHours, totals.estHours, true]}
+        />
+        <PairCard
+          leftLabel="Standard Hours"
+          left={num(totals.standard, 0)}
+          rightLabel="Overtime Hours"
+          right={num(totals.overtime, 0)}
+          rightTone={totals.overtime > 0 ? 'text-red-600' : 'text-gray-900'}
+        />
+        <PairCard
+          leftLabel="Estimated Labor Cost"
+          left={money(totals.estLabor)}
+          rightLabel="Actual Labor Cost"
+          right={money(totals.actLabor)}
+          compare={[totals.actLabor, totals.estLabor, true]}
+        />
+        <PairCard
+          leftLabel="Estimated Gross Profit"
+          left={money(totals.estGP)}
+          rightLabel="Actual Gross Profit"
+          right={money(totals.actGP)}
+          compare={[totals.actGP, totals.estGP, false]}
+        />
+        <PairCard
+          leftLabel="Estimated GLPMD"
+          left={money2(totals.estGlpmd)}
+          rightLabel="Actual GLPMD"
+          right={money2(totals.actGlpmd)}
+          compare={[totals.actGlpmd, totals.estGlpmd, false]}
+        />
       </div>
 
       {/* ── Job by job ───────────────────────────────────────────────────── */}
@@ -431,21 +450,30 @@ export default function CrewReport() {
   )
 }
 
-// `compare` is [actual, estimate, inverse] — inverse marks a figure where
-// spending LESS is the good outcome.
-function Box({ label, value, tone, compare }) {
-  let color = tone || 'text-white'
-  if (!tone && compare) {
+// A card holds one estimated/actual pair. `compare` is [actual, estimate,
+// inverse] — inverse marks a figure where spending LESS is the good outcome.
+function PairCard({ leftLabel, left, rightLabel, right, rightTone, compare }) {
+  let tone = rightTone || 'text-gray-900'
+  if (!rightTone && compare) {
     const [act, est, inverse] = compare
     if (Number.isFinite(act) && Number.isFinite(est) && est !== 0) {
       const bad = inverse ? act > est : act < est
-      color = Math.abs(act - est) < 0.005 ? 'text-white' : bad ? 'text-red-400' : 'text-green-400'
+      tone = Math.abs(act - est) < 0.005 ? 'text-gray-900' : bad ? 'text-red-600' : 'text-green-700'
     }
   }
   return (
-    <div className="rounded-lg border border-white/15 bg-black/20 px-3 py-2.5 text-center">
-      <p className="text-[11px] font-bold text-gray-300 mb-1 truncate">{label}</p>
-      <p className={`text-2xl font-bold tabular-nums ${color}`}>{value}</p>
+    <div className="rounded-xl border border-gray-200 bg-white shadow-sm px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 text-center flex-1">
+          <p className="text-[11px] font-bold text-gray-500 truncate">{leftLabel}</p>
+          <p className="text-2xl font-bold tabular-nums text-gray-900">{left}</p>
+        </div>
+        <div className="w-px self-stretch bg-gray-100" />
+        <div className="min-w-0 text-center flex-1">
+          <p className="text-[11px] font-bold text-gray-500 truncate">{rightLabel}</p>
+          <p className={`text-2xl font-bold tabular-nums ${tone}`}>{right}</p>
+        </div>
+      </div>
     </div>
   )
 }
