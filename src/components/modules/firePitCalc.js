@@ -18,12 +18,45 @@ export const num = v => parseFloat(v) || 0
 // every selectable finish dropped to masterWallMeta and zeroed material + labor.
 export const WF_META = {
   'Sand Stucco': { key: 'sandStucco', labKey: 'sandStuccoLab', unit: 'SF', labMode: 'perDay' },
-  'Smooth Stucco': { key: 'smoothStucco', labKey: 'smoothStuccoLab', unit: 'SF', labMode: 'perDay' },
-  'Ledgerstone Veneer': { key: 'ledgerstone', labKey: 'ledgerstoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
-  'Stacked Stone Veneer': { key: 'stackedStone', labKey: 'stackedStoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
+  'Smooth Stucco': {
+    key: 'smoothStucco',
+    labKey: 'smoothStuccoLab',
+    unit: 'SF',
+    labMode: 'perDay',
+  },
+  'Ledgerstone Veneer': {
+    key: 'ledgerstone',
+    labKey: 'ledgerstoneLab',
+    unit: 'SF',
+    labMode: 'perDay',
+    waste: 1.1,
+    screwPer5: 2,
+  },
+  'Stacked Stone Veneer': {
+    key: 'stackedStone',
+    labKey: 'stackedStoneLab',
+    unit: 'SF',
+    labMode: 'perDay',
+    waste: 1.1,
+    screwPer5: 2,
+  },
   Tile: { key: 'tile', labKey: 'tileLab', unit: 'SF', labMode: 'perSF', adhesivePerSF: 1 },
-  'Real Flagstone': { key: 'realFlagstone', labKey: 'flagstoneLab', unit: 'stone', labMode: 'perSF', delivPerSF: 1, misc: 268.75 },
-  'Real Stone': { key: 'realStone', labKey: 'realStoneLab', unit: 'stone', labMode: 'perSF', delivPerSF: 2.5714, addPerSF: 1 },
+  'Real Flagstone': {
+    key: 'realFlagstone',
+    labKey: 'flagstoneLab',
+    unit: 'stone',
+    labMode: 'perSF',
+    delivPerSF: 1,
+    misc: 268.75,
+  },
+  'Real Stone': {
+    key: 'realStone',
+    labKey: 'realStoneLab',
+    unit: 'stone',
+    labMode: 'perSF',
+    delivPerSF: 2.5714,
+    addPerSF: 1,
+  },
 }
 export const WF_LIST = Object.keys(WF_META)
 
@@ -81,7 +114,10 @@ export function computeFinishRow(row, { meta, vendorUnit, mp, fpRates }) {
   let mat
   if (meta.unit === 'stone') {
     mat =
-      sf * unit + sf * (meta.delivPerSF || 0) + (meta.misc || 0) + (meta.addPerSF ? sf * meta.addPerSF : 0)
+      sf * unit +
+      sf * (meta.delivPerSF || 0) +
+      (meta.misc || 0) +
+      (meta.addPerSF ? sf * meta.addPerSF : 0)
   } else {
     mat =
       sf * unit * (meta.waste || 1) +
@@ -95,5 +131,32 @@ export function computeFinishRow(row, { meta, vendorUnit, mp, fpRates }) {
     hrs: sf * labRate, // all finish labor is hours per Sq Ft
     unit,
     laborUnset: labRate <= 0 ? unpriced(labName, row.type) : null,
+  }
+}
+
+// ── Fire pit fill (lava rock / fire glass) ───────────────────────────────────
+// Fill is sold by the bag, so the rate table keeps the shelf price and the bag's
+// coverage lives on the product as calc_meta.cu_ft_per_unit. That conversion is
+// what lets the row show a $ per Cu Ft figure without a coefficient in code. A
+// product with no coverage recorded is read as already priced per Cu Ft.
+export function fillUnitPrice(item) {
+  if (!item) return 0
+  const per = num(item.calc_meta && item.calc_meta.cu_ft_per_unit)
+  const price = num(item.unit_cost)
+  return per > 0 ? price / per : price
+}
+
+// Fill row: Cu Ft × $ per Cu Ft material, Cu Ft × hours-per-Cu-Ft labor.
+// An unset labor rate returns 0 hours AND the unpriced flag — never a guess.
+export function computeFillRow(row, { item, mp, labName }) {
+  const cuft = num(row.cuft)
+  if (!item || cuft <= 0) return { mat: 0, hrs: 0, unit: 0, laborUnset: null }
+  const unit = fillUnitPrice(item)
+  const labRate = num(mp[labName])
+  return {
+    mat: cuft * unit,
+    hrs: cuft * labRate,
+    unit,
+    laborUnset: labRate <= 0 ? unpriced(labName, row.type || item.name) : null,
   }
 }

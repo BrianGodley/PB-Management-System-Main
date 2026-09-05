@@ -1,9 +1,15 @@
 import FinancialSummaryList from './FinancialSummaryList'
 import { catalogItemFor } from '../../lib/materialCatalog'
+import { computeFillRow } from './firePitCalc'
 import { STRUCT_CALC } from './FirePitModule'
 
 const STRUCT_TYPES = ['CMU', 'PIP', 'Modular', 'Brick']
-const STRUCT_LABEL = { CMU: 'CMU Block', PIP: 'Poured in Place', Modular: 'Modular', Brick: 'Brick' }
+const STRUCT_LABEL = {
+  CMU: 'CMU Block',
+  PIP: 'Poured in Place',
+  Modular: 'Modular',
+  Brick: 'Brick',
+}
 
 // Resolve a master-list finish/cap row (sub_category=cat, Unspecified) → meta with
 // its material unit + calc_meta params, mirroring the module so summary line items
@@ -74,12 +80,45 @@ const CAP_META = {
 // Wall-finish master list (mirrors the module) — material unit price + labor by Type.
 const WF_META = {
   'Sand Stucco': { key: 'sandStucco', labKey: 'sandStuccoLab', unit: 'SF', labMode: 'perDay' },
-  'Smooth Stucco': { key: 'smoothStucco', labKey: 'smoothStuccoLab', unit: 'SF', labMode: 'perDay' },
-  'Ledgerstone Veneer': { key: 'ledgerstone', labKey: 'ledgerstoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
-  'Stacked Stone Veneer': { key: 'stackedStone', labKey: 'stackedStoneLab', unit: 'SF', labMode: 'perDay', waste: 1.1, screwPer5: 2 },
+  'Smooth Stucco': {
+    key: 'smoothStucco',
+    labKey: 'smoothStuccoLab',
+    unit: 'SF',
+    labMode: 'perDay',
+  },
+  'Ledgerstone Veneer': {
+    key: 'ledgerstone',
+    labKey: 'ledgerstoneLab',
+    unit: 'SF',
+    labMode: 'perDay',
+    waste: 1.1,
+    screwPer5: 2,
+  },
+  'Stacked Stone Veneer': {
+    key: 'stackedStone',
+    labKey: 'stackedStoneLab',
+    unit: 'SF',
+    labMode: 'perDay',
+    waste: 1.1,
+    screwPer5: 2,
+  },
   Tile: { key: 'tile', labKey: 'tileLab', unit: 'SF', labMode: 'perSF', adhesivePerSF: 1 },
-  'Real Flagstone': { key: 'realFlagstone', labKey: 'flagstoneLab', unit: 'stone', labMode: 'perSF', delivPerSF: 1, misc: 268.75 },
-  'Real Stone': { key: 'realStone', labKey: 'realStoneLab', unit: 'stone', labMode: 'perSF', delivPerSF: 2.5714, addPerSF: 1 },
+  'Real Flagstone': {
+    key: 'realFlagstone',
+    labKey: 'flagstoneLab',
+    unit: 'stone',
+    labMode: 'perSF',
+    delivPerSF: 1,
+    misc: 268.75,
+  },
+  'Real Stone': {
+    key: 'realStone',
+    labKey: 'realStoneLab',
+    unit: 'stone',
+    labMode: 'perSF',
+    delivPerSF: 2.5714,
+    addPerSF: 1,
+  },
 }
 
 // Gas line + gas fixture labor fallbacks (Utilities catalog, hrs per unit).
@@ -130,6 +169,7 @@ export default function FirePitSummary({ module }) {
     hoursAdj = 0,
     capRows = [],
     wallFinishRows = [],
+    fillRows = [],
     epLineRows = [],
     epGasRows = [],
     manualRows = [],
@@ -149,22 +189,21 @@ export default function FirePitSummary({ module }) {
   //    structure type (CMU/PIP/Modular/Brick) reprices from a single source of
   //    truth (not the old CMU-only derivation). Legacy bids stored the CMU wall
   //    flat on the In-House record → fold onto structs.CMU. ────────────────────
-  const structs =
-    ih.structs || {
-      CMU: {
-        wallLF: ih.wallLF,
-        wallHeightIn: ih.wallHeightIn,
-        footingWidthIn: ih.footingWidthIn,
-        footingDepthIn: ih.footingDepthIn,
-        rebarSpacingIn: ih.rebarSpacingIn,
-        bondBeamCourses: ih.bondBeamCourses,
-        pctGrouted: ih.pctGrouted,
-        pctCurved: ih.pctCurved,
-        useGroutPump: ih.useGroutPump,
-        layoutHrs: ih.layoutHrs,
-        rebarSize: ih.rebarSize ?? data.rebarSize ?? '#4',
-      },
-    }
+  const structs = ih.structs || {
+    CMU: {
+      wallLF: ih.wallLF,
+      wallHeightIn: ih.wallHeightIn,
+      footingWidthIn: ih.footingWidthIn,
+      footingDepthIn: ih.footingDepthIn,
+      rebarSpacingIn: ih.rebarSpacingIn,
+      bondBeamCourses: ih.bondBeamCourses,
+      pctGrouted: ih.pctGrouted,
+      pctCurved: ih.pctCurved,
+      useGroutPump: ih.useGroutPump,
+      layoutHrs: ih.layoutHrs,
+      rebarSize: ih.rebarSize ?? data.rebarSize ?? '#4',
+    },
+  }
   const structResults = STRUCT_TYPES.map(t => ({
     type: t,
     struct: structs[t] || {},
@@ -184,7 +223,8 @@ export default function FirePitSummary({ module }) {
       // (calc_meta.labor_rate). No type fallback — an unset rate reads as 0 here
       // (read-only view; the live module surfaces the fix-it modal).
       const labName = meta.master ? meta.labor_rate : FP_RATES[meta.labKey].dbName
-      const labCoef = meta.master && n(meta.laborCoeff) > 0 ? n(meta.laborCoeff) : labName ? mp(labName) : 0
+      const labCoef =
+        meta.master && n(meta.laborCoeff) > 0 ? n(meta.laborCoeff) : labName ? mp(labName) : 0
       return { label: r.type, lf, mat: lf * unit, hrs: lf * labCoef }
     })
     .filter(Boolean)
@@ -214,13 +254,28 @@ export default function FirePitSummary({ module }) {
       }
       // Labor: numeric coefficient, else the default-labor pointer. No type fallback.
       const labName = meta.master ? meta.labor_rate : FP_RATES[meta.labKey].dbName
-      const labRate = meta.master && n(meta.laborCoeff) > 0 ? n(meta.laborCoeff) : labName ? mp(labName) : 0
+      const labRate =
+        meta.master && n(meta.laborCoeff) > 0 ? n(meta.laborCoeff) : labName ? mp(labName) : 0
       const hrs = sf * labRate // all finish labor is hours per Sq Ft now
       return { label: r.type, sf, mat, hrs }
     })
     .filter(Boolean)
   const finishMat = finishLines.reduce((s, c) => s + c.mat, 0)
   const finishHrs = finishLines.reduce((s, c) => s + c.hrs, 0)
+
+  // ── Fire pit fill ────────────────────────────────────────────────────────────
+  // Shares computeFillRow with the live module so the two can never disagree
+  // about what a cubic foot of fill costs.
+  const fillLines = (fillRows || [])
+    .map(r => {
+      const item = (materialRows || []).find(m => m.ref_key === r.type || m.id === r.type) || null
+      const c = computeFillRow(r, { item, mp: materialPrices, labName: 'FP Fill Labor Rate' })
+      if (c.mat <= 0 && c.hrs <= 0) return null
+      return { label: item?.name || r.type, cuft: n(r.cuft), mat: c.mat, hrs: c.hrs }
+    })
+    .filter(Boolean)
+  const fillMat = fillLines.reduce((s, c) => s + c.mat, 0)
+  const fillHrs = fillLines.reduce((s, c) => s + c.hrs, 0)
 
   // ── Gas line + gas fixtures (material fallbacks; DB rate overrides when present) ──
   const gasLineLines = (epLineRows || [])
@@ -257,11 +312,11 @@ export default function FirePitSummary({ module }) {
 
   // Structure materials + hours come from the per-type STRUCT_CALC results above
   // (single source of truth); the old CMU-only single-struct derivation is retired.
-  const baseHrs = structHrs + capHrs + finishHrs + gasHrs + manHrs
+  const baseHrs = structHrs + capHrs + finishHrs + fillHrs + gasHrs + manHrs
   const diffMod = 1 + n(difficulty) / 100
   const totalHrs = baseHrs * diffMod + n(hoursAdj)
   const manDays = totalHrs / 8
-  const totalMat = structMat + capMat + finishMat + gasMat + manMat
+  const totalMat = structMat + capMat + finishMat + fillMat + gasMat + manMat
   const laborCost = n(savedCalc.laborCost)
   const burden = n(savedCalc.burden)
   const gp = n(savedCalc.gp)
@@ -347,6 +402,16 @@ export default function FirePitSummary({ module }) {
           <SectionLabel title="Wall Finishes" />
           {finishLines.map((c, i) => (
             <LineRow key={i} label={c.label} value={`${c.sf} Sq Ft`} sub={fmt(c.mat)} />
+          ))}
+        </>
+      )}
+
+      {/* Firepit Fill */}
+      {fillLines.length > 0 && (
+        <>
+          <SectionLabel title="Firepit Fill" />
+          {fillLines.map((c, i) => (
+            <LineRow key={i} label={c.label} value={`${c.cuft} Cu Ft`} sub={fmt(c.mat)} />
           ))}
         </>
       )}
